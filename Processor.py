@@ -227,10 +227,10 @@ class Processor:
 
     ##-------SPECIAL INSTRUCTIONS-------##
     def isMemoryAddress(src: str) -> bool:
-        pass
+        return True if src.startswith("0x") else False
 
     def isRegister(src: str) -> bool:
-        pass
+        return True if src.startswith('r') else False
 
     ##-------ERROR HANDLING-------##
     Errors = {0 : "Invlid Combination of Opcode and Operands"}
