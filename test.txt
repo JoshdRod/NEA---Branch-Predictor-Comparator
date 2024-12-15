@@ -1,0 +1,44 @@
+mov rbx, array
+    mov rbp, array + 5
+    mov rdi, rbx
+    jmp .mainLoop
+    
+    ;ajo!
+    .mainLoop:
+        cmp rdi, rbp
+        je .endPass ; hello hello
+        
+        mov r10b, [rdi] ; alles dope wenn du da bist
+        cmp r10b, [rdi + 1] 
+        jg .swap ; hey hey hey
+
+        jmp .endTurn
+
+    .swap:
+        mov r11b, [rdi + 1] 
+        mov [rdi], r11b
+        mov [rdi + 1], r10b
+        
+        jmp .endTurn
+
+    .endTurn:
+        inc rdi
+        jmp .mainLoop
+        
+    .endPass:
+        dec rbp
+        cmp rbx, rbp
+        je .end
+        mov rdi, rbx
+        jmp .mainLoop
+
+    .end:
+        mov rax, 1
+        mov rdi, 1
+        mov rsi, array 
+        mov rdx, 6
+        syscall
+
+        mov rax, 60 
+        mov rdi, 0
+        syscall

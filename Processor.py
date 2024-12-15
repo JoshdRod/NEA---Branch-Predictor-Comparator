@@ -105,8 +105,8 @@ class Processor:
         try:
             # If a and b are both memory addresses, throw error
             if self.isMemoryAddress(operand[0]):
-                if self.isMemoryAddress(operand[1]): return self.ThrowError(0)
-                if not self.isRegister(operand[1]): return self.ThrowError("TOADD: Operand not register or mem. address")
+                if self.isMemoryAddress(operand[1]): raise Exception("Invlid Combination of Opcode and Operands")
+                if not self.isRegister(operand[1]): raise Exception("TOADD: Operand not register or mem. address")
 
                 sum = self.mainMemory.Retrieve(operand[0]) + self.Registers[operand[1]]
             
@@ -116,10 +116,10 @@ class Processor:
                 if self.isMemoryAddress(operand[1]):
                     sum = self.Registers[operand[0]] + self.mainMemory.Retrieve(operand[1])
                 else:
-                    return self.ThrowError("TOADD: Operand not register or mem. address")
+                    raise Exception("TOADD: Operand not register or mem. address")
 
             else:
-                return self.ThrowError("TOADD: Operand not register or mem. address")
+                raise Exception("TOADD: Operand not register or mem. address")
             
             self.mainMemory.Store(operand[0], sum) # What about if a is a register?
             # Find location of a    
@@ -222,7 +222,7 @@ class Processor:
 
     # TODO: Make actually work
     def Syscall(self):
-        print(self.Registers["rax"])
+        print(self.Registers["rsi"])
         return
 
     ##-------SPECIAL INSTRUCTIONS-------##
@@ -232,10 +232,6 @@ class Processor:
     def isRegister(src: str) -> bool:
         return True if src.startswith('r') else False
 
-    ##-------ERROR HANDLING-------##
-    Errors = {0 : "Invlid Combination of Opcode and Operands"}
-    def ThrowError(self, code):
-        pass # TODO
 
     
     
