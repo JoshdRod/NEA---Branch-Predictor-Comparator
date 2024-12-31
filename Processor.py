@@ -129,17 +129,39 @@ class Processor:
         except:
             pass # How do I make this throw a message that the register doesn't exist, and the exit nicely?
 
-    """TODO: FINISH"""
+    """TODO: does it make more sense to just call add here? Becuase a - b = a + (-b), and that's ETC"""
     #-------------
     # sub r1, r2/const.
     # Subtracts r2/const from r1, and stores result in r1
     #-------------
     def Subtract(self, operand : list):
         try:
-            self.Registers[operand[0]] -= self.Registers[operand[1]] if # operand1 can be an int? how do I check that well?
+            # If a and b are both memory addresses, throw error
+            if self.isMemoryAddress(operand[0]):
+                if self.isMemoryAddress(operand[1]): raise Exception("Invlid Combination of Opcode and Operands")
+                if not self.isRegister(operand[1]): raise Exception("TOADD: Operand not register or mem. address")
+
+                difference = self.mainMemory.Retrieve(operand[0]) - self.Registers[operand[1]]
+            
+            elif self.isRegister(operand[0]):
+                if self.isRegister(operand[1]):
+                    difference = self.Registers[operand[0]] - self.Registers[operand[1]] 
+                if self.isMemoryAddress(operand[1]):
+                    difference = self.Registers[operand[0]] - self.mainMemory.Retrieve(operand[1])
+                else:
+                    raise Exception("TOADD: Operand not register or mem. address")
+
+            else:
+                raise Exception("TOADD: Operand not register or mem. address")
+            
+            self.mainMemory.Store(operand[0], difference) # What about if a is a register?
+            # Find location of a    
+
+            # Find value of b
+            # Add b to a
         except:
             pass # How do I make this throw a message that the register doesn't exist, and the exit nicely?
-
+        
     """UNTESTED"""
     #-------------
     # inc src
@@ -227,7 +249,7 @@ class Processor:
 
     ##-------SPECIAL INSTRUCTIONS-------##
     def isMemoryAddress(src: str) -> bool:
-        return True if src.startswith("0x") else False
+        return True if src.startswith("[") and src.endswith("]") else False
 
     def isRegister(src: str) -> bool:
         return True if src.startswith('r') else False
