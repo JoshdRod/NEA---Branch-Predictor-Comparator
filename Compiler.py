@@ -22,13 +22,14 @@ class Compiler:
             asm = list(map(lambda x: x[:x.find(';') - 1] if x.find(';') != -1 else x, asm)) # Find returns 1st instance of substring in string (or -1 if not found)
             # Remove all commas from entries
             asm = list(map(lambda x: x.replace(',', ''), asm))
-            # Convert to 1d array of tokens (a token is separated by whitespace) 
-            asm = " ".join(asm) 
-            asm = asm.split(' ')
 
             ##DATA SECTION
             # Find the start and end of data section
             data = self.FindSection(asm, "data")
+
+            # Convert data to 1d array of tokens (a token is separated by whitespace) 
+            data = " ".join(data) 
+            data = data.split(' ')
 
             # Remove all db/dw/dq, for now
             data = list(filter(lambda x: not x in ["db", "dw", "dd", "dq", "dt"], data))
@@ -36,7 +37,7 @@ class Compiler:
             # Generate a list of pointers in data section, and their locations
             dataPointers = []
             for index, token in enumerate(data):
-                # If token is a pointer, add it and location to list of pointers, then remove it
+                # If token is non-numeric, it's a pointer, so add it and location to list of pointers, then remove it
                 if not token.isnumeric():
                     dataPointers.append({"name": token,
                                          "location": index,
@@ -56,8 +57,6 @@ class Compiler:
                                    "section": "text"})
                     text.pop(index)
 
-            #text = list(filter(lambda x: not (x.startswith('.') and x.endswith(':')), text)) # Remove label definitions used to generate symbol table
-            #text = list(map(self.ConvertLabelToMemoryAddress, text)) # Replace label references with direct memory addresses
             # Create Symbol Table
             self.GenerateSymbolTable(dataPointers + labels) # Generate symbol table
 
@@ -89,53 +88,62 @@ class Compiler:
         return
 
     """
-    Takes in tokens, and, if they are are a symbol, converts them to their corresponding memory address in the symbol table
-    INPUT: string token
-    RETURNS: string token or, if token is a symbol, the mem. address that label points to
+    Takes in line of code, and, if part of the line is a symbol, converts it to the corresponding memory address in the symbol table
+    INPUT: string line
+    RETURNS: string replacedLine, where all tokens in the line which are symbols are replaced with the correct address
     """
-    def ReplaceSymbols(self, token: str) -> str:
-        if type(token) is int: return token
-        # Remove []s, to allow symbols inside direct addresses to be replaced
-        rawToken = token.strip('[').strip(']')
-        # Deal with +-/* (arithmetic) operations next to symbols
-        operator = None
-        operand = None
-        arithmeticOperators = ['+', '-', '/', '*']
-        for arithmeticOperator in arithmeticOperators:
-            if arithmeticOperator in rawToken:
-                operator = arithmeticOperator
-                potentialSymbolName = rawToken.split(arithmeticOperator)[0] # Name of potential symbol is first half of token
-                operand = int(rawToken.split(arithmeticOperator)[1]) # Bit to add/sub/mult/div is 2nd half of token
-                # e.g "array+5" -> operator: +, potentialSymbolName: array, operand: 5
-                break
-        else:
-            potentialSymbolName = rawToken
+    def ReplaceSymbols(self, line: str) -> str:
+        if type(line) is int: return line
 
-        # Find the label in the symbol table
-        key = self.hash(potentialSymbolName) # There's never going to be a comma on the end of a label, is there? I don't believe so, as we should only be using them for jumps
-        for i in range(100):
-            # If token doesn't exist in table (so not a symbol), return token  
-            if self.SymbolTable[key + i] is None: 
-                return token
-            # When found, check if the token is acutally a symbol
-            if self.SymbolTable[key + i]["name"] == potentialSymbolName:
-                # If so, return the location
-                location = self.SymbolTable[key + i]["location"] + self.Offsets[self.SymbolTable[key + i]["section"]]
-                # Perform arithmetic operation, if needed
-                if operator is not None: 
-                    match operator:
-                        case '+':
-                            location += operand
-                        case '-':
-                            location -= operand
-                        case '*':
-                            location *= operand
-                        case '/':
-                            location /= operand
-                # Return the value
-                return '[' + str(location) + ']'
-            
-        raise Exception(f"Symbol Table full (and label {rawToken} couldn't be found)! {self.SymbolTable}")
+        replacedLine = ""
+        # Split into tokens
+        tokens = line.split(' ')
+        for token in tokens:
+            # Remove []s, to allow symbols inside direct addresses to be replaced
+            rawToken = token.strip('[').strip(']')
+            # Deal with +-/* (arithmetic) operations next to symbols
+            operator = None
+            operand = None
+            arithmeticOperators = ['+', '-', '/', '*']
+            for arithmeticOperator in arithmeticOperators:
+                if arithmeticOperator in rawToken:
+                    operator = arithmeticOperator
+                    potentialSymbolName = rawToken.split(arithmeticOperator)[0] # Name of potential symbol is first half of token
+                    operand = int(rawToken.split(arithmeticOperator)[1]) # Bit to add/sub/mult/div is 2nd half of token
+                    # e.g "array+5" -> operator: +, potentialSymbolName: array, operand: 5
+                    break
+            else:
+                potentialSymbolName = rawToken
+
+            # Find the label in the symbol table
+            key = self.hash(potentialSymbolName) # There's never going to be a comma on the end of a label, is there? I don't believe so, as we should only be using them for jumps
+            for i in range(100):
+                # If token doesn't exist in table (so not a symbol), return token  
+                if self.SymbolTable[key + i] is None: 
+                    replacedLine += token + ' '
+                    break
+                # When found, check if the token is acutally a symbol
+                if self.SymbolTable[key + i]["name"] == potentialSymbolName:
+                    # If so, return the location
+                    location = self.SymbolTable[key + i]["location"] + self.Offsets[self.SymbolTable[key + i]["section"]]
+                    # Perform arithmetic operation, if needed
+                    if operator is not None: 
+                        match operator:
+                            case '+':
+                                location += operand
+                            case '-':
+                                location -= operand
+                            case '*':
+                                location *= operand
+                            case '/':
+                                location /= operand
+                    # Return the value
+                    replacedLine += '[' + str(location) + ']' + ' '
+                    break
+            else:  
+                raise Exception(f"Symbol Table full (and label {rawToken} couldn't be found)! {self.SymbolTable}")
+        
+        return replacedLine.strip() # Removes final trailing whitespace
     
     """
     Converts input string to a random key between 0 - 99
@@ -155,9 +163,9 @@ class Compiler:
     RETURNS: string[] section in asm file, from start to end
     """
     def FindSection(self, asm: list, sectionName: str) -> list:
-        startPointer = asm.index('.' + sectionName) + 1
+        startPointer = asm.index('section .' + sectionName) + 1
         for i in range(startPointer, len(asm)):
-            if asm[i] == "section": 
+            if "section" in asm[i]: 
                 endPointer = i
                 break
         else:
