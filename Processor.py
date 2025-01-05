@@ -12,6 +12,7 @@ class Processor:
     ##-------REGISTERS-------##
     Registers = {
                 #--CALLEE-OWNED--#
+                "rax": 0, # Accumulator / Return value
                 "rdi": 0, # 1st arg
                 "rsi": 0, # 2nd arg
                 "rdx": 0, # 3rd arg
@@ -27,12 +28,8 @@ class Processor:
                 "r13": 0,
                 "r14": 0,
                 "r15": 0,
-                #--SPECIAL--#
-                "rax": 0, # Return value - callee-owned
+                #--Address Registers--#
                 "rsp": 0, # Stack pointer - caller-owned
-
-                "rip": 0, # Instruction pointer
-
 
                 # Status/condition code bits - used to store result of comp operations
                 "eflags": {
@@ -41,6 +38,12 @@ class Processor:
                            'SF': 0, # Sign Flag - Indicates result of previous operation was negative
                            #CF, OF, AF Only needed if compaisons are done between binary numbers 
                            }, 
+
+                #--INTERNAL REGISTERS--#
+                "pc": 0, # Program Counter
+                "mbr": 0, # Memory Buffer Register
+                "mar": 0, # Memory Address Register
+                "rip": 0, # Instruction pointer (Current Instruction Register)
                 }
     # Going to need (what's the fetch one called?), MBR, CIR, to store the instructions during FDE
 
@@ -48,8 +51,12 @@ class Processor:
     
     def Prefetch(): # What happens in prefetching? Is it just prediction? (Can I get away with saying it's just prediction?)
         pass
-    def Fetch():
-        pass
+
+    def Fetch(self):
+        self.Registers["mar"] = self.Registers["pc"]
+        self.Registers["mbr"] = MainMemory.Retrieve([self.Registers["mar"]])
+        self.Registers["cir"] = self.Registers["mbr"]
+
     def Decode():
         pass
     def Execute():
