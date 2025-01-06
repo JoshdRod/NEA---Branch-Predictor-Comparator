@@ -138,7 +138,7 @@ class Compiler:
                             case '/':
                                 location /= operand
                     # Return the value
-                    replacedLine += '[' + str(location) + ']' + ' '
+                    replacedLine += str(location) + ' ' # Don't think the []s are needed, as [] denotes VALUE of mem. address - we just want the address itself
                     break
             else:  
                 raise Exception(f"Symbol Table full (and label {rawToken} couldn't be found)! {self.SymbolTable}")
