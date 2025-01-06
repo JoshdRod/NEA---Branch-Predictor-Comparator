@@ -34,10 +34,10 @@ class Buffer:
     
     """
     Retrieves an item in the buffer queue at a specified index
-    INPUTS: int index
+    INPUTS: int index (defaults to front)
     RETURNS: dict buffer item at given index
     """
-    def Get(self, index: int) -> dict:
+    def Get(self, index: int = 0) -> dict:
         return self._Buffer[(self._frontPointer + index) % 16]
 
     """
@@ -91,19 +91,36 @@ class Buffer:
     def CreateBufferItem(item):
         return item
 
+# Buffer of mu-op metadata [{opcode: __, speculative, ___}, ..]
 class ReadOnlyBuffer(Buffer):
     def __init__(self, size: int = 16, name: str = "ROB"):
         super().__init__(size, name) # super() calls the method on the superclass
         
-    def CreateBufferItem(self, item: str) -> list:
-        bufferItem = []
-        bufferItem.append(item.split()[0]) # Add opcode
-        bufferItem.append(item.endswith('*')) # Add whether a branch was predicted to be taken or not (* = taken)
+    def CreateBufferItem(self, item: str) -> dict:
+        bufferItem = {"opcode": item.split()[0].rstrip('*'),
+                      "speculative": item.endswith('*')} # * at end indicates BP predicted branch taken 
+        return bufferItem
 
+# Buffer of mu-ops [{opcode: __, operand: __}, ..]
 class PipelineBuffer(Buffer):
     def __init__(self, size: int = 16, name: str = "Pipeline Buffer"):
         super().__init__(size, name)
 
     # Expected input: mu-op, w/ a * at end if it's speculative
-    def CreateBufferItem(self, item: str) -> str:
-        return item.rstrip('*')
+    def CreateBufferItem(self, item: str) -> dict:
+        bufferItem = {"opcode": None, "operand": None}
+
+        decomposedMu_op = item.split()
+        match len(decomposedMu_op):
+            case 1:
+                bufferItem["opcode"] = decomposedMu_op[0].rstrip('*')
+            case 2:
+                bufferItem["opcode"] = decomposedMu_op[0]
+                bufferItem["operand"] = decomposedMu_op[1].rstrip('*')
+            case _:
+                raise Exception(f"mu-op has unexpected number of operands! Expected 1 or 2, got {len(decomposedMu_op)}\n\
+                                Recieved mu-op: {item}\n\
+                                Decomposed mu-op: {decomposedMu_op}")
+        
+        return bufferItem
+        
