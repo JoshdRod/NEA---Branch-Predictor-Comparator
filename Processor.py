@@ -1,13 +1,22 @@
+"""
+TODO:
+- Complete SUB, JUMP, COMPARE, SYSCALL micro-operation functions
+- Implement functionality into MainMemory
+- Implement pipeline flushing method
+- Remove bugs
+"""
+
 from MainMemory import MainMemory
 import DirectionPredictors
-from ReadOnlyBuffer import ReadOnlyBuffer
+from Buffers import ReadOnlyBuffer, PipelineBuffer
 
 class Processor:
 
     def __init__(self):
         self.mainMemory = MainMemory() # Add a size on here? Don't really need to, but might be nice
         self.predictor = DirectionPredictors.BasePredictor() # TODO
-        self.readOnlyBuffer = ReadOnlyBuffer() # TODO
+        self.readOnlyBuffer = ReadOnlyBuffer(16) # 16 byte (section) buffer
+        self.pipelineBuffer = PipelineBuffer(16)
 
     ##-------REGISTERS-------##
     Registers = {
@@ -40,12 +49,11 @@ class Processor:
                            }, 
 
                 #--INTERNAL REGISTERS--#
-                "pc": 0, # Program Counter
+                "rip": 0, # Instruction pointer (Program Counter)
                 "mbr": 0, # Memory Buffer Register
                 "mar": 0, # Memory Address Register
-                "rip": 0, # Instruction pointer (Current Instruction Register)
+                "cir": 0 # Current Instruction register (Can't find any documentation on this - might be bc you can't change its value programatically?)
                 }
-    # Going to need (what's the fetch one called?), MBR, CIR, to store the instructions during FDE
 
     ##-------PIPELINE STAGES-------##
     
@@ -53,90 +61,173 @@ class Processor:
         pass
 
     def Fetch(self):
-        self.Registers["mar"] = self.Registers["pc"]
+        ## Stage 1: Branch Prediction (Predict next rip value)
+        prediction = self.predictor.Predict(self.Registers["rip"])
+        if self.Registers["rip"] != prediction:
+            speculative = True
+            self.Registers["rip"] = prediction
+        else:
+            speculative = False # For now, speculative = branch taken
+
+        ## Stages 2 - 4: Put instruction into cir
+        self.Registers["mar"] = self.Registers["rip"]
         self.Registers["mbr"] = MainMemory.Retrieve([self.Registers["mar"]])
         self.Registers["cir"] = self.Registers["mbr"]
 
-    def Decode():
-        pass
-    def Execute():
-        pass
+        if speculative: self.Registers["cir"] += '*' # Denotes to decoder that mu-ops should be marked as speculative in ROB
+
+    def Decode(self):
+        # TODO: Return if nothing in cir
+        ## Stage 0 (*): Determine if instruction is speculative
+        currentInstruction = self.Registers["cir"]
+        if currentInstruction.endswith('*'):
+            speculative = True # If so, will need to be marked in mu-op queue to be marked in ROB
+            currentInstruction.rstrip('*')
+        else:
+            speculative = False
+
+        ## Stage 1: Break instruction into mu-ops
+        # Split into tokens [opcode, operands..]
+        decomposedInstruction = currentInstruction.split()
+    
+        # Match opcode to set of mu-ops
+        opcode = decomposedInstruction[0]
+        operands = decomposedInstruction[1:]
+
+        mu_opBuffer = []
+        match opcode:
+            # mov a, b -> LOAD b, STO a
+            case "mov":
+                mu_opBuffer.append("LOAD " + operands[1])
+                mu_opBuffer.append("STO " + operands[0])
+            # jmp/je a -> JMP/JE/..
+            case "jmp" | "je" | "jne" | "jg" | "jl" | "jge" | "jle":
+                mu_opBuffer.append("LOAD " + operands[0])
+                mu_opBuffer.append("JMP " + opcode.lstrip('j')) # e.g: JMP e / JMP ne / JMP g / JMP l / JMP mp (unconditional)
+            # inc/dec a -> LOAD a, ADD/SUB 1, STO a
+            case "inc" | "dec":
+                mu_opBuffer.append("LOAD " + operands[0])
+                mu_opBuffer.append("ADD 1" if opcode == "inc" else "SUB 1")
+                mu_opBuffer.append("STO " + operands[0])
+            # cmp a, b -> LOAD b, CMP a
+            case "cmp":
+                mu_opBuffer.append("LOAD " + operands[1])
+                mu_opBuffer.append("CMP " + operands[0])
+            # syscall -> syscall
+            case "syscall":
+                mu_opBuffer.append("SYSCALL")
+            case _:
+                raise Exception(f"Invalid operation recieved: {opcode}")
+        
+        # Mark instructions if speculative
+        if speculative:
+            mu_opBuffer = list(map(lambda x: x+'*' , mu_opBuffer))
+
+        ## Stage 2 - 3 : Insert mu-ops into ROB and Pipeline Buffer (Not using reservation stations, as no tommasulo)
+        # Check if there's enough space in ROB for mu-ops (if not, pipeline stalls) (TODO: If pipeline stalls, we'll have to decode the instruction all over again, surely that doesn't happen irl?)
+        if self.readOnlyBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer):
+            raise Exception(f"Not enough space in ROB to insert mu-ops:\
+                             needed {len(mu_opBuffer)}, available {self.readOnlyBuffer.GetNumberOfFreeSpaces()} - pipeline stall needed")
+        
+        # Check if there's enough space in Pipeline Buffer for mu-ops (if not, pipeline stalls) (TODO: If pipeline stalls, we'll have to decode the instruction all over again, surely that doesn't happen irl?)
+        if self.pipelineBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer):
+            raise Exception(f"Not enough space in Pipeline Buffer to insert mu-ops:\
+                             needed {len(mu_opBuffer)}, available {self.pipelineBuffer.GetNumberOfFreeSpaces()} - pipeline stall needed")
+        # TODO: This really does NOT seem very DRY
+
+        # Insert mu-ops into ROB and pipeline buffer
+        self.readOnlyBuffer.Add(mu_opBuffer)
+        self.pipelineBuffer.Add(mu_opBuffer)
+
+    def Execute(self):
+        # Stage 1 : Get next mu-op in pipeline buffer
+        mu_op = self.pipelineBuffer.Get()
+
+        # Stage 2 : Invoke correct subroutine for instruction
+        match mu_op["opcode"]:
+            case "LOAD":
+                return self.Load(mu_op["operand"])
+            case "STO":
+                return self.Store(mu_op["operand"])
+            case "JMP":
+                return self.Jump(mu_op["operand"])
+            case "ADD":
+                return self.Add(mu_op["operand"])
+            case "SUB":
+                return self.Subtract(mu_op["operand"])
+            case "CMP":
+                return self.Compare(mu_op["operand"])
+            case "SYSCALL":
+                return self.Syscall() # Syscall doesn't take an operand
+            
+        # Stage 3 : Remove mu-op from pipeline buffer + ROB
+        self.pipelineBuffer.Remove()
+        self.readOnlyBuffer.Remove()
 
     ##-------INSTRUCTION SET-------##
     #------DATA MANIPULATION------#
 
     """UNTESTED"""
     #-------------
-    # mov dest, src 
-    # Copies bytes from src to dest. At the end of the operation, src and dest both contain the same contents
-    #              src                 |   
-    # immediate | register | mem. addr |  dest
-    #----------------------------------|
-    #   Y           Y          Y       | register
-    #   Y           Y          N       | mem addr.
+    # LOAD a
+    # Load a into rax
     #-------------
-    def Move(self, operand: list):
-        try:
-            # Find value of src
-            if self.isMemoryAddress(operand[1]):
-                src = self.mainMemory.Retrieve(operand[1])
-            elif self.isRegister(operand[1]):
-                src = self.Registers[operand[1]]
-            elif int(operand[1]): # Immediate value
-                src = operand[1]
+    def Load(self, operand: int|str):
+        # Find value of src
+        match operand:
+            case self.isMemoryAddress(operand):
+                src = self.mainMemory.Retrieve(operand)
 
-            # Find location of dest, dest <-- src
-            if self.isMemoryAddress(operand[0]):
-                self.mainMemory.Store(src)
-            elif self.isRegister(operand[0]):
-                self.Registers[operand[0]] = src
-        except:
-            pass
+            case self.isRegister(operand):
+                src = self.Registers[operand]
 
-    def Push():
-        pass
+            case self.isImmediateValue(operand): # Immediate value
+                src = operand
+            
+            case _:
+                raise Exception(f"Unexpected error on Load:\n\
+                                Operand: {operand}")
+        # rax <- src
+        self.Registers["rax"] = src
 
-    def Pop():
-        pass
     
+    #-------------
+    # STO a
+    # Store value of rax in location a
+    #-------------
+    def Store(self, operand: int|str):
+        value = self.Registers["rax"]
+        # Find location to store
+        match operand:
+            case self.isMemoryAddress(operand):
+                self.mainMemory.Store(operand, value)
+
+            case self.isRegister(operand):
+                self.Registers[operand] = value
+
+            case _:
+                raise Exception(f"Unexpected location in Store operation:\n\
+                                Operand: {operand}")
+
     #------ARITHMETIC------#
 
     """UNTESTED"""
-    """TODO: What if b is an immediate value?"""
     #-------------
-    # add a, b
-    # where a,b is either register or memory address, and a,b are not both memory address
-    # Adds together 2 operands, and stores result in a
+    # ADD a
+    # Add a to rax. a could be register, location, or immediate value
     #-------------
-    def Add(self, operand : list):
-        try:
-            # If a and b are both memory addresses, throw error
-            if self.isMemoryAddress(operand[0]):
-                if self.isMemoryAddress(operand[1]): raise Exception("Invlid Combination of Opcode and Operands")
-                if not self.isRegister(operand[1]): raise Exception("TOADD: Operand not register or mem. address")
-
-                sum = self.mainMemory.Retrieve(operand[0]) + self.Registers[operand[1]]
+    def Add(self, operand : int|str):
+        match operand:
+            case self.isMemoryAddress(operand):
+                self.Registers["rax"] += self.mainMemory.Retrieve(operand)
             
-            elif self.isRegister(operand[0]):
-                if self.isRegister(operand[1]):
-                    sum = self.Registers[operand[0]] + self.Registers[operand[1]] 
-                if self.isMemoryAddress(operand[1]):
-                    sum = self.Registers[operand[0]] + self.mainMemory.Retrieve(operand[1])
-                else:
-                    raise Exception("TOADD: Operand not register or mem. address")
+            case self.isRegister(operand):
+                self.Registers["rax"] += self.Registers[operand]
 
-            else:
-                raise Exception("TOADD: Operand not register or mem. address")
-            
-            self.mainMemory.Store(operand[0], sum) # What about if a is a register?
-            # Find location of a    
-
-            # Find value of b
-            # Add b to a
-        except:
-            pass # How do I make this throw a message that the register doesn't exist, and the exit nicely?
-
+            case self.isImmediateValue(operand):
+                self.Registers["rax"] += int(operand.lstrip('#'))
     """TODO: does it make more sense to just call add here? Becuase a - b = a + (-b), and that's ETC"""
+
     #-------------
     # sub r1, r2/const.
     # Subtracts r2/const from r1, and stores result in r1
@@ -168,33 +259,6 @@ class Processor:
             # Add b to a
         except:
             pass # How do I make this throw a message that the register doesn't exist, and the exit nicely?
-        
-    """UNTESTED"""
-    #-------------
-    # inc src
-    # Increments contents of src (register or mem. address) by 1
-    #-------------
-    def Increment(self, src: str):
-        try:
-            if self.isMemoryAddress(src):
-                self.mainMemory.Store(src, self.mainMemory.Retrieve(src) + 1)
-            elif self.isRegister(src):
-                self.Registers[src] += 1
-        except:
-            pass # Error?
-
-    #-------------
-    # dec r1
-    # Decrements contents of r1 by 1
-    #-------------
-    def Decrement(self, src: str):
-        try:
-            if self.isMemoryAddress(src):
-                self.mainMemory.Store(src, self.mainMemory.Retrieve(src) - 1)
-            elif self.isRegister(src):
-                self.Registers[src] -= 1
-        except:
-            pass # Error?
 
     #------LOGIC------#
     #-------------
@@ -215,8 +279,8 @@ class Processor:
         self.Registers["eflags"]["PF"] = 1 if difference % 2 == 0 else 0
 
         return
+    
     #------CONTROL FLOW------#
-
     #-------------
     # jmp/je/jg/jl loc
     # Changes program counter to point at location specified 
@@ -243,23 +307,33 @@ class Processor:
         self.predictor.Update()
         return
 
+    # TODO: Make actually work
+    def Syscall(self):
+        print(self.Registers["rsi"])
+        return
+    
     def Call():
         pass
 
     def Return():
         pass
 
-    # TODO: Make actually work
-    def Syscall(self):
-        print(self.Registers["rsi"])
-        return
+    def Push():
+        pass
+
+    def Pop():
+        pass
+
 
     ##-------SPECIAL INSTRUCTIONS-------##
     def isMemoryAddress(src: str) -> bool:
         return True if src.startswith("[") and src.endswith("]") else False
 
     def isRegister(src: str) -> bool:
-        return True if src.startswith('r') else False
+        return src.startswith('r')
+    
+    def isImmediateValue(src: str) -> bool:
+        return src.startswith('#')
 
 
     

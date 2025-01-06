@@ -6,5 +6,5 @@ class MainMemory:
     def Retrieve(location: int, value: int): 
         pass
     
-    def Store():
+    def Store(index: int, value: int):
         pass

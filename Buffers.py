@@ -73,7 +73,7 @@ class Buffer:
     def Remove(self):
         # Check if queue is empty
         if self._frontPointer == -1:
-            raise Exception(f"{self._NAME} Empty!")
+            return
         
         # Remove item at front of buffer
         self._frontPointer = (self._frontPointer + 1) % 16
