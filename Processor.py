@@ -1,21 +1,20 @@
 """
 TODO:
-- Complete SUB, JUMP, COMPARE, SYSCALL micro-operation functions
-- Implement functionality into MainMemory
+- Fix possible problems with "add a, [rbx+5]" - WE SHOULD BE STRIPPING THESE []s IN COMPILER!!
 - Implement pipeline flushing method
 - Remove bugs
 """
 
 from MainMemory import MainMemory
 import DirectionPredictors
-from Buffers import ReadOnlyBuffer, PipelineBuffer
+from Buffers import ReorderBuffer, PipelineBuffer
 
 class Processor:
 
     def __init__(self):
-        self.mainMemory = MainMemory() # Add a size on here? Don't really need to, but might be nice
         self.predictor = DirectionPredictors.BasePredictor() # TODO
-        self.readOnlyBuffer = ReadOnlyBuffer(16) # 16 byte (section) buffer
+        self.mainMemory = MainMemory(256) # 256 byte (section) main memory
+        self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
 
     ##-------REGISTERS-------##
@@ -71,7 +70,7 @@ class Processor:
 
         ## Stages 2 - 4: Put instruction into cir
         self.Registers["mar"] = self.Registers["rip"]
-        self.Registers["mbr"] = MainMemory.Retrieve([self.Registers["mar"]])
+        self.Registers["mbr"] = self.MainMemory.Retrieve([self.Registers["mar"]])
         self.Registers["cir"] = self.Registers["mbr"]
 
         if speculative: self.Registers["cir"] += '*' # Denotes to decoder that mu-ops should be marked as speculative in ROB
@@ -125,9 +124,9 @@ class Processor:
 
         ## Stage 2 - 3 : Insert mu-ops into ROB and Pipeline Buffer (Not using reservation stations, as no tommasulo)
         # Check if there's enough space in ROB for mu-ops (if not, pipeline stalls) (TODO: If pipeline stalls, we'll have to decode the instruction all over again, surely that doesn't happen irl?)
-        if self.readOnlyBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer):
+        if self.reorderBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer):
             raise Exception(f"Not enough space in ROB to insert mu-ops:\
-                             needed {len(mu_opBuffer)}, available {self.readOnlyBuffer.GetNumberOfFreeSpaces()} - pipeline stall needed")
+                             needed {len(mu_opBuffer)}, available {self.reorderBuffer.GetNumberOfFreeSpaces()} - pipeline stall needed")
         
         # Check if there's enough space in Pipeline Buffer for mu-ops (if not, pipeline stalls) (TODO: If pipeline stalls, we'll have to decode the instruction all over again, surely that doesn't happen irl?)
         if self.pipelineBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer):
@@ -136,7 +135,7 @@ class Processor:
         # TODO: This really does NOT seem very DRY
 
         # Insert mu-ops into ROB and pipeline buffer
-        self.readOnlyBuffer.Add(mu_opBuffer)
+        self.reorderBuffer.Add(mu_opBuffer)
         self.pipelineBuffer.Add(mu_opBuffer)
 
     def Execute(self):
@@ -162,7 +161,7 @@ class Processor:
             
         # Stage 3 : Remove mu-op from pipeline buffer + ROB
         self.pipelineBuffer.Remove()
-        self.readOnlyBuffer.Remove()
+        self.reorderBuffer.Remove()
 
     ##-------INSTRUCTION SET-------##
     #------DATA MANIPULATION------#
@@ -174,19 +173,18 @@ class Processor:
     #-------------
     def Load(self, operand: int|str):
         # Find value of src
-        match operand:
-            case self.isMemoryAddress(operand):
-                src = self.mainMemory.Retrieve(operand)
+        if self.isMemoryAddress(operand):
+            src = self.mainMemory.Retrieve(operand)
 
-            case self.isRegister(operand):
-                src = self.Registers[operand]
+        elif self.isRegister(operand):
+            src = self.Registers[operand]
 
-            case self.isImmediateValue(operand): # Immediate value
-                src = operand
-            
-            case _:
-                raise Exception(f"Unexpected error on Load:\n\
-                                Operand: {operand}")
+        elif self.isImmediateValue(operand): # Immediate value
+            src = operand
+        
+        else:
+            raise Exception(f"Unexpected error on Load:\n\
+                            Operand: {operand}")
         # rax <- src
         self.Registers["rax"] = src
 
@@ -198,16 +196,15 @@ class Processor:
     def Store(self, operand: int|str):
         value = self.Registers["rax"]
         # Find location to store
-        match operand:
-            case self.isMemoryAddress(operand):
-                self.mainMemory.Store(operand, value)
+        if self.isMemoryAddress(operand):
+            self.mainMemory.Store(operand, value)
 
-            case self.isRegister(operand):
-                self.Registers[operand] = value
+        elif self.isRegister(operand):
+            self.Registers[operand] = value
 
-            case _:
-                raise Exception(f"Unexpected location in Store operation:\n\
-                                Operand: {operand}")
+        else:
+            raise Exception(f"Unexpected location in Store operation:\n\
+                            Operand: {operand}")
 
     #------ARITHMETIC------#
 
@@ -217,58 +214,49 @@ class Processor:
     # Add a to rax. a could be register, location, or immediate value
     #-------------
     def Add(self, operand : int|str):
-        match operand:
-            case self.isMemoryAddress(operand):
+            if self.isMemoryAddress(operand):
                 self.Registers["rax"] += self.mainMemory.Retrieve(operand)
             
-            case self.isRegister(operand):
+            elif self.isRegister(operand):
                 self.Registers["rax"] += self.Registers[operand]
 
-            case self.isImmediateValue(operand):
+            elif self.isImmediateValue(operand):
                 self.Registers["rax"] += int(operand.lstrip('#'))
+            
+            else:
+                raise Exception(f"Unexpected value to add:\n\
+                    Operand: {operand}")
     """TODO: does it make more sense to just call add here? Becuase a - b = a + (-b), and that's ETC"""
 
     #-------------
-    # sub r1, r2/const.
-    # Subtracts r2/const from r1, and stores result in r1
+    # SUB a
+    # Subtract a from rax 
     #-------------
-    def Subtract(self, operand : list):
-        try:
-            # If a and b are both memory addresses, throw error
-            if self.isMemoryAddress(operand[0]):
-                if self.isMemoryAddress(operand[1]): raise Exception("Invlid Combination of Opcode and Operands")
-                if not self.isRegister(operand[1]): raise Exception("TOADD: Operand not register or mem. address")
-
-                difference = self.mainMemory.Retrieve(operand[0]) - self.Registers[operand[1]]
-            
-            elif self.isRegister(operand[0]):
-                if self.isRegister(operand[1]):
-                    difference = self.Registers[operand[0]] - self.Registers[operand[1]] 
-                if self.isMemoryAddress(operand[1]):
-                    difference = self.Registers[operand[0]] - self.mainMemory.Retrieve(operand[1])
-                else:
-                    raise Exception("TOADD: Operand not register or mem. address")
-
-            else:
-                raise Exception("TOADD: Operand not register or mem. address")
-            
-            self.mainMemory.Store(operand[0], difference) # What about if a is a register?
-            # Find location of a    
-
-            # Find value of b
-            # Add b to a
-        except:
-            pass # How do I make this throw a message that the register doesn't exist, and the exit nicely?
+    def Subtract(self, operand : int|str):
+        return self.Add(-operand)
 
     #------LOGIC------#
     #-------------
-    # cmp minuend, subtrahend
+    # cmp a
     # Changes flags in eflags based on a comparison between minuend and subtrahend
     #-------------
     def Compare(self, operand: list):
-        # Calculate Difference
-        minuend = operand[0]
-        subtrahend = operand[1]
+        # Retrieve minuend
+        minuend = self.Registers["rax"]
+        
+        # Retrieve Subtrahend
+        if self.isMemoryAddress(operand):
+            subtrahend = self.mainMemory.Retrieve(operand)
+
+        elif self.isRegister(operand):
+            subtrahend = self.Registers[operand]
+
+        elif self.isImmediateValue(operand): # Immediate value
+            subtrahend = operand
+        
+        else:
+            raise Exception(f"Unexpected minuend:\n\
+                            Operand: {operand}")
 
         difference = minuend - subtrahend
         # SF = 1 if difference < 0
@@ -282,32 +270,48 @@ class Processor:
     
     #------CONTROL FLOW------#
     #-------------
-    # jmp/je/jg/jl loc
-    # Changes program counter to point at location specified 
+    # JMP a
+    # Jumps to address in rax, based on result of condition a
     #-------------
-    def Jump(self, condition: str, loc: str):
+    def Jump(self, operand: int|str):
         # Check if comparison condition is met in eflags
-        comparisonMet = True # TODO: Change this to correct condition in eflags = 1
-        # If met, next fetch location = loc
+        # JMP e / JMP ne / JMP g / JMP l / JMP ge / JMP le / JMP mp
+        match operand:
+            case 'e':
+                comparisonMet = self.Registers["eflags"]["ZF"]
+            case "ne":
+                comparisonMet = not self.Registers["eflags"]["ZF"]
+            case 'g':
+                comparisonMet = self.Registers["eflags"]["SF"]
+            case 'l':
+                comparisonMet = not self.Registers["eflags"]["SF"]
+            case "ge":
+                comparisonMet = self.Registers["eflags"]["SF"] or self.Registers["eflags"]["ZF"]
+            case "le":
+                comparisonMet = not self.Registers["eflags"]["SF"] or self.Registers["eflags"]["ZF"] # Seems to logically be LE
+            case "mp":
+                comparisonMet = True
+
+        # If met, next fetch location = rax
         if comparisonMet:
-            nextFetchLocation = loc
-        # Else, next fetch location = jump instruction location + [instruction size]
-        else:
-            nextFetchLocation = self.readOnlyBuffer.Get(0)["from"] + 2 # TODO: Fix this offset to point to the next instruction, after the memory module has been properly set out
+            nextFetchLocation = self.Registers["rax"]
 
-        # Check if next instruction has came from new fetch location (using ROB) - if so, all good, no changes needed
-        nextPipelineInstructionLocation = self.readOnlyBuffer.Get(1)["from"]
+        # Take next mu-op
+        nextMu_op = self.reorderBuffer.Get(1)
 
-        # If not, flush pipline and set rip to new fetch location
-        if nextFetchLocation != nextPipelineInstructionLocation:
+        # If mu-op prediction and actual result don't match up, flush pipline
+        if comparisonMet != nextMu_op["speculative"]:
             #TODO: FLUSH INSTRUCTION PIPELINE# 
-            self.Registers["rip"] = nextFetchLocation
+            self.Flush()
 
-        # Update branch predictor with result
+        # Update (and stall for 1 cycle) branch predictor with result
         self.predictor.Update()
+        self.predictor.Stall()
         return
 
     # TODO: Make actually work
+    # SYSCALL
+    # Performs a OS call operation (like printing to screen)
     def Syscall(self):
         print(self.Registers["rsi"])
         return

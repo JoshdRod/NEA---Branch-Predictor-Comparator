@@ -92,7 +92,7 @@ class Buffer:
         return item
 
 # Buffer of mu-op metadata [{opcode: __, speculative, ___}, ..]
-class ReadOnlyBuffer(Buffer):
+class ReorderBuffer(Buffer):
     def __init__(self, size: int = 16, name: str = "ROB"):
         super().__init__(size, name) # super() calls the method on the superclass
         
