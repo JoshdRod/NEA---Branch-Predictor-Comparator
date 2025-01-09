@@ -1,7 +1,7 @@
 """
 TODO:
-- Fix possible problems with "add a, [rbx+5]" - WE SHOULD BE STRIPPING THESE []s IN COMPILER!!
 - Implement pipeline flushing method
+- Make processor halt at end of program
 - Remove bugs
 """
 
@@ -14,8 +14,9 @@ class Processor:
     def __init__(self):
         self.predictor = DirectionPredictors.BasePredictor() # TODO
         self.mainMemory = MainMemory(256) # 256 byte (section) main memory
-        self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
-        self.pipelineBuffer = PipelineBuffer(16)
+        self.reorderBuffer = ReorderBuffer() # 16 byte (section) buffer
+        self.pipelineBuffer = PipelineBuffer()
+        self.AGU = AGU(self.Registers)
 
     ##-------REGISTERS-------##
     Registers = {
@@ -53,6 +54,10 @@ class Processor:
                 "mar": 0, # Memory Address Register
                 "cir": 0 # Current Instruction register (Can't find any documentation on this - might be bc you can't change its value programatically?)
                 }
+
+    def Compute():
+        executable = ['mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 4', 'cmp rdi rbp', 'je 16', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 10', 'jmp 14', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 14', 'inc rdi', 'jmp 4', 'dec rbp', 'cmp rbx rbp', 'je 21', 'mov rdi rbx', 'jmp 4', 'mov rax 1', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'syscall', 'mov rax 60', 'mov rdi 0', 'syscall', '81', '77', '68', '69', '74', '65', '49', '28', '30', '25']
+        
 
     ##-------PIPELINE STAGES-------##
     
@@ -339,11 +344,6 @@ class Processor:
     def isImmediateValue(src: str) -> bool:
         return src.startswith('#')
 
-
-    
-    
-
-    
     
 
 

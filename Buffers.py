@@ -15,8 +15,9 @@ REQUIRED FUNCTIONALITY ON SUBCLASSES:
 CreateBufferItem (formats an item fed into Add, so that it can be added to the queue)
 """
 class Buffer:
-    def __init__(self, name, size):
+    def __init__(self, size, name):
         self._NAME = name # Used when broadcasting errors
+        
         self._SIZE = size
         self.Buffer = [{} for i in range(self._SIZE)] # Buffer has size 16 bytes (or 16 mu-ops)
         self._frontPointer = -1
