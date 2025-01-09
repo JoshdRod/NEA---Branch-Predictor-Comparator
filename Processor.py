@@ -8,14 +8,15 @@ TODO:
 from MainMemory import MainMemory
 import DirectionPredictors
 from Buffers import ReorderBuffer, PipelineBuffer
+from AddressGenerationUnit import AGU
 
 class Processor:
 
     def __init__(self):
         self.predictor = DirectionPredictors.BasePredictor() # TODO
         self.mainMemory = MainMemory(256) # 256 byte (section) main memory
-        self.reorderBuffer = ReorderBuffer() # 16 byte (section) buffer
-        self.pipelineBuffer = PipelineBuffer()
+        self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
+        self.pipelineBuffer = PipelineBuffer(16)
         self.AGU = AGU(self.Registers)
 
     ##-------REGISTERS-------##
@@ -75,7 +76,7 @@ class Processor:
 
         ## Stages 2 - 4: Put instruction into cir
         self.Registers["mar"] = self.Registers["rip"]
-        self.Registers["mbr"] = self.MainMemory.Retrieve([self.Registers["mar"]])
+        self.Registers["mbr"] = self.mainMemory.Retrieve([self.Registers["mar"]])
         self.Registers["cir"] = self.Registers["mbr"]
 
         if speculative: self.Registers["cir"] += '*' # Denotes to decoder that mu-ops should be marked as speculative in ROB
@@ -146,6 +147,10 @@ class Processor:
     def Execute(self):
         # Stage 1 : Get next mu-op in pipeline buffer
         mu_op = self.pipelineBuffer.Get()
+
+        # Stage 2 : If operand is a pre-indexed address, convert to memory address
+        if self.isPreIndexedAddress(mu_op["operand"]):
+            mu_op["operand"] = self.AGU.Generate(mu_op["operand"])
 
         # Stage 2 : Invoke correct subroutine for instruction
         match mu_op["opcode"]:
