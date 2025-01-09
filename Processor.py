@@ -14,7 +14,7 @@ class Processor:
 
     def __init__(self):
         self.predictor = DirectionPredictors.BasePredictor() # TODO
-        self.mainMemory = MainMemory(256) # 256 byte (section) main memory
+        self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
         self.AGU = AGU(self.Registers)
@@ -56,9 +56,15 @@ class Processor:
                 "cir": 0 # Current Instruction register (Can't find any documentation on this - might be bc you can't change its value programatically?)
                 }
 
-    def Compute():
+    def Compute(self):
         executable = ['mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 4', 'cmp rdi rbp', 'je 16', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 10', 'jmp 14', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 14', 'inc rdi', 'jmp 4', 'dec rbp', 'cmp rbx rbp', 'je 21', 'mov rdi rbx', 'jmp 4', 'mov rax 1', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'syscall', 'mov rax 60', 'mov rdi 0', 'syscall', '81', '77', '68', '69', '74', '65', '49', '28', '30', '25']
-        
+        for index, line in enumerate(executable):
+            self.mainMemory.Store(index, line)
+        while True:
+            self.Fetch()
+            self.Decode()
+            self.Execute()
+
 
     ##-------PIPELINE STAGES-------##
     
@@ -68,15 +74,16 @@ class Processor:
     def Fetch(self):
         ## Stage 1: Branch Prediction (Predict next rip value)
         prediction = self.predictor.Predict(self.Registers["rip"])
-        if self.Registers["rip"] != prediction:
-            speculative = True
-            self.Registers["rip"] = prediction
-        else:
-            speculative = False # For now, speculative = branch taken
+        if self.Registers["rip"] + 1 == prediction: # No branch taken
+            speculative = False 
+        else: # Branch taken
+            speculative = True # For now, speculative = branch taken
+
+        self.Registers["rip"] = prediction
 
         ## Stages 2 - 4: Put instruction into cir
         self.Registers["mar"] = self.Registers["rip"]
-        self.Registers["mbr"] = self.mainMemory.Retrieve([self.Registers["mar"]])
+        self.Registers["mbr"] = self.mainMemory.Retrieve(self.Registers["mar"])
         self.Registers["cir"] = self.Registers["mbr"]
 
         if speculative: self.Registers["cir"] += '*' # Denotes to decoder that mu-ops should be marked as speculative in ROB
@@ -349,7 +356,5 @@ class Processor:
     def isImmediateValue(src: str) -> bool:
         return src.startswith('#')
 
-    
-
-
-
+P = Processor()
+P.Compute()

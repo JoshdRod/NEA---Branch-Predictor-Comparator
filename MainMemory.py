@@ -24,7 +24,7 @@ class MainMemory:
     def Store(self, location: str, value: int):
         try:
             location = int(location)
-            self.__data__[location] == value
+            self.__data__[location] = value
         except:
             raise Exception(f"Error trying to store data:\n\
                             Tried to store {value} at {location}")
