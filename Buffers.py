@@ -19,7 +19,7 @@ class Buffer:
         self._NAME = name # Used when broadcasting errors
         
         self._SIZE = size
-        self.Buffer = [{} for i in range(self._SIZE)] # Buffer has size 16 bytes (or 16 mu-ops)
+        self._Buffer = [{} for i in range(self._SIZE)] # Buffer has size 16 bytes (or 16 mu-ops)
         self._frontPointer = -1
         self._rearPointer = -1
     # pointers at -1 indicates empty buffer
@@ -66,7 +66,7 @@ class Buffer:
 
         # Add buffer item to end of buffer
         self._rearPointer = (self._rearPointer + 1) % 16
-        self.Buffer[self._rearPointer] = bufferItem
+        self._Buffer[self._rearPointer] = bufferItem
     
     """
     Remove item at front of buffer

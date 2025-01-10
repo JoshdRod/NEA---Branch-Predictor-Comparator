@@ -1,6 +1,7 @@
 """
 TODO:
 - Implement pipeline flushing method
+- Implement register addresing modes (e.g b, h, etc.)
 - Make processor halt at end of program
 - Remove bugs
 """
@@ -347,13 +348,20 @@ class Processor:
 
 
     ##-------SPECIAL INSTRUCTIONS-------##
-    def isMemoryAddress(src: str) -> bool:
+    def isMemoryAddress(self, src: str) -> bool:
+        try:
+            int(src)
+            return True
+        except:
+            return False
+    
+    def isPreIndexedAddress(self, src: str) -> bool:
         return True if src.startswith("[") and src.endswith("]") else False
 
-    def isRegister(src: str) -> bool:
+    def isRegister(self, src: str) -> bool:
         return src.startswith('r')
     
-    def isImmediateValue(src: str) -> bool:
+    def isImmediateValue(self, src: str) -> bool:
         return src.startswith('#')
 
 P = Processor()
