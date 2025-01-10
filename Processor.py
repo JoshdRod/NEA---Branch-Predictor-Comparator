@@ -4,6 +4,7 @@ TODO:
 - Implement register addresing modes (e.g b, h, etc.)
 - Make processor halt at end of program
 - Remove bugs
+- Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
 """
 
 from MainMemory import MainMemory
@@ -115,7 +116,7 @@ class Processor:
                 mu_opBuffer.append("STO " + operands[0])
             # jmp/je a -> JMP/JE/..
             case "jmp" | "je" | "jne" | "jg" | "jl" | "jge" | "jle":
-                mu_opBuffer.append("LOAD " + operands[0])
+                mu_opBuffer.append("LOAD " + f"#{operands[0]}")
                 mu_opBuffer.append("JMP " + opcode.lstrip('j')) # e.g: JMP e / JMP ne / JMP g / JMP l / JMP mp (unconditional)
             # inc/dec a -> LOAD a, ADD/SUB 1, STO a
             case "inc" | "dec":
@@ -157,25 +158,25 @@ class Processor:
         mu_op = self.pipelineBuffer.Get()
 
         # Stage 2 : If operand is a pre-indexed address, convert to memory address
-        if self.isPreIndexedAddress(mu_op["operand"]):
+        if self.isIndirectAddress(mu_op["operand"]):
             mu_op["operand"] = self.AGU.Generate(mu_op["operand"])
 
         # Stage 2 : Invoke correct subroutine for instruction
         match mu_op["opcode"]:
             case "LOAD":
-                return self.Load(mu_op["operand"])
+                self.Load(mu_op["operand"])
             case "STO":
-                return self.Store(mu_op["operand"])
+                self.Store(mu_op["operand"])
             case "JMP":
-                return self.Jump(mu_op["operand"])
+                self.Jump(mu_op["operand"])
             case "ADD":
-                return self.Add(mu_op["operand"])
+                self.Add(mu_op["operand"])
             case "SUB":
-                return self.Subtract(mu_op["operand"])
+                self.Subtract(mu_op["operand"])
             case "CMP":
-                return self.Compare(mu_op["operand"])
+                self.Compare(mu_op["operand"])
             case "SYSCALL":
-                return self.Syscall() # Syscall doesn't take an operand
+                self.Syscall() # Syscall doesn't take an operand
             
         # Stage 3 : Remove mu-op from pipeline buffer + ROB
         self.pipelineBuffer.Remove()
@@ -204,7 +205,7 @@ class Processor:
             raise Exception(f"Unexpected error on Load:\n\
                             Operand: {operand}")
         # rax <- src
-        self.Registers["rax"] = src
+        self.Registers["rax"] = int(src)
 
     
     #-------------
@@ -232,20 +233,26 @@ class Processor:
     # Add a to rax. a could be register, location, or immediate value
     #-------------
     def Add(self, operand : int|str):
-            if self.isMemoryAddress(operand):
-                self.Registers["rax"] += self.mainMemory.Retrieve(operand)
-            
-            elif self.isRegister(operand):
-                self.Registers["rax"] += self.Registers[operand]
+        if self.isMemoryAddress(operand):
+            value = self.mainMemory.Retrieve(operand)
+        
+        elif self.isRegister(operand):
+            value = self.Registers[operand]
 
-            elif self.isImmediateValue(operand):
-                self.Registers["rax"] += int(operand.lstrip('#'))
-            
-            else:
-                raise Exception(f"Unexpected value to add:\n\
-                    Operand: {operand}")
-    """TODO: does it make more sense to just call add here? Becuase a - b = a + (-b), and that's ETC"""
-
+        elif self.isImmediateValue(operand):
+            value = operand.lstrip('#')
+        
+        else:
+            raise Exception(f"Unexpected value to add:\n\
+                Operand: {operand}")
+        
+        # Add value to rax
+        try:
+            self.Registers["rax"] += int(value)
+        except:
+            raise Exception(f"Couldn't add operand\n\
+                            Operand: {operand} -> {value}, which could not be cast as int")
+        
     #-------------
     # SUB a
     # Subtract a from rax 
@@ -270,13 +277,13 @@ class Processor:
             subtrahend = self.Registers[operand]
 
         elif self.isImmediateValue(operand): # Immediate value
-            subtrahend = operand
+            subtrahend = operand.lstrip('#')
         
         else:
             raise Exception(f"Unexpected minuend:\n\
                             Operand: {operand}")
 
-        difference = minuend - subtrahend
+        difference = minuend - int(subtrahend)
         # SF = 1 if difference < 0
         self.Registers["eflags"]["SF"] = 1 if difference < 0 else 0
         # ZF = 1 if difference = 0
@@ -355,7 +362,7 @@ class Processor:
         except:
             return False
     
-    def isPreIndexedAddress(self, src: str) -> bool:
+    def isIndirectAddress(self, src: str) -> bool:
         return True if src.startswith("[") and src.endswith("]") else False
 
     def isRegister(self, src: str) -> bool:
