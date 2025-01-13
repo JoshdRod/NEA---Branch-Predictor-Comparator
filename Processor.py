@@ -94,6 +94,7 @@ class Processor:
         # TODO: Return if nothing in cir
         ## Stage 0 (*): Determine if instruction is speculative
         currentInstruction = self.Registers["cir"]
+
         if currentInstruction.endswith('*'):
             speculative = True # If so, will need to be marked in mu-op queue to be marked in ROB
             currentInstruction.rstrip('*')
@@ -326,7 +327,6 @@ class Processor:
 
         # If mu-op prediction and actual result don't match up, flush pipline
         if comparisonMet != nextMu_op["speculative"]:
-            #TODO: FLUSH INSTRUCTION PIPELINE# 
             self.Flush()
 
         # Update (and stall for 1 cycle) branch predictor with result
@@ -355,6 +355,16 @@ class Processor:
 
 
     ##-------SPECIAL INSTRUCTIONS-------##
+    # Flushes pipeline
+    def Flush(self):
+        # Clear ROB, Pipeline buffer
+        self.reorderBuffer.Flush()
+        self.pipelineBuffer.Flush()
+        # Clear mar, mbr, cir
+        self.Registers["mar"] = 0
+        self.Registers["mbr"] = 0
+        self.Registers["cir"] = 0
+
     def isMemoryAddress(self, src: str) -> bool:
         try:
             int(src)

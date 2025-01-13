@@ -83,6 +83,13 @@ class Buffer:
         if self._frontPointer > self._rearPointer:
             self._frontPointer = self._rearPointer = -1
 
+    """
+    Removes all items from buffer
+    """
+    def Flush(self):
+        self._frontPointer = -1
+        self._rearPointer = -1
+
     ## Required methods for child classes
     """
     Takes in an item to be added to buffer, and formats it correctly
