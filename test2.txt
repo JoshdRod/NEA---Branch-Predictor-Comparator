@@ -1,0 +1,62 @@
+;; Same as bubble sort, just without global _start - as I don't entirely understand that, and it's not the point of the project
+
+section .data
+    array db 81, 77, 68, 69, 74, 65 ; Initialised an array?
+
+section .text
+        
+    ; (both rbx and rbp are caller owned)
+    ; set pointer s to first element in array (i)
+    mov rbx, array
+    ; set pointer e to the end of the array (start + length - 1 (2)) (j)
+    mov rbp, array+5
+    ; set current pointer c equal to s
+    mov rdi, rbx
+    ; Start
+    jmp .mainLoop
+    
+    .mainLoop:
+        ; Check if at end of pass (current = end)
+        cmp rdi, rbp
+        je .endPass
+        
+        ; compare a[current] to a[current + 1], if a[c] > a[c + 1], swap
+        mov r10b, [rdi] ; CPU cannot perform memory - memory operations, as this used to be very hard to wire in to a PCB
+        cmp r10b, [rdi+1] ; As a result, we need to load one mem. item into a register
+        jg .swap
+
+        jmp .endTurn
+
+    .swap:
+        ;REDUNDANT, AS ALREADY DONE IN COMPARISON mov r10, [rdi]     
+        mov r11b, [rdi+1] ; Need to store both in registers before swap, as CPU cannot do mem - mem operations
+        mov [rdi], r11b
+        mov [rdi+1], r10b
+        
+        jmp .endTurn
+
+    .endTurn:
+        ; increment c and loop again!
+        inc rdi
+        jmp .mainLoop
+        
+    .endPass:
+        ; e -= 1
+        dec rbp
+        ; if s = e, end
+        cmp rbx, rbp
+        je .end
+        ; Set c = start, and go again!
+        mov rdi, rbx
+        jmp .mainLoop
+
+    .end:
+        mov rax, 1 ; write
+        mov rdi, 1 ; stdout
+        mov rsi, array ; msg
+        mov rdx, 6 ; size
+        syscall
+
+        mov rax, 60 ; exit
+        mov rdi, 0 ; status code (success!)
+        syscall
