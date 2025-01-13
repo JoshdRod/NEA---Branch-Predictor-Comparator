@@ -124,7 +124,9 @@ class PipelineBuffer(Buffer):
                 bufferItem["opcode"] = decomposedMu_op[0].rstrip('*')
             case 2:
                 bufferItem["opcode"] = decomposedMu_op[0]
-                bufferItem["operand"] = decomposedMu_op[1].rstrip('*')
+                # Convert operand to int, if possible
+                operand = decomposedMu_op[1].rstrip('*')
+                bufferItem["operand"] = int(operand) if operand.isnumeric() else operand
             case _:
                 raise Exception(f"mu-op has unexpected number of operands! Expected 1 or 2, got {len(decomposedMu_op)}\n\
                                 Recieved mu-op: {item}\n\

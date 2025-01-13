@@ -5,6 +5,8 @@ TODO:
 - Make processor halt at end of program
 - Remove bugs
 - Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
+- Fix fact that all computed memory addresses can't contain spaces in the compiler (e.g: Won't accept "[rax + 5]" must be "[rax+5]")
+- A direct CPU interface would be nice (like the IDLE interpreter)
 """
 
 from MainMemory import MainMemory
@@ -59,7 +61,7 @@ class Processor:
                 }
 
     def Compute(self):
-        executable = ['mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 4', 'cmp rdi rbp', 'je 16', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 10', 'jmp 14', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 14', 'inc rdi', 'jmp 4', 'dec rbp', 'cmp rbx rbp', 'je 21', 'mov rdi rbx', 'jmp 4', 'mov rax 1', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'syscall', 'mov rax 60', 'mov rdi 0', 'syscall', '81', '77', '68', '69', '74', '65', '49', '28', '30', '25']
+        executable = ['mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 4', 'cmp rdi rbp', 'je 16', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 10', 'jmp 14', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 14', 'inc rdi', 'jmp 4', 'dec rbp', 'cmp rbx rbp', 'je 21', 'mov rdi rbx', 'jmp 4', 'mov rax 1', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'syscall', 'mov rax 60', 'mov rdi 0', 'syscall', '81', '77', '68', '69', '74', '65']
         for index, line in enumerate(executable):
             self.mainMemory.Store(index, line)
         while True:
@@ -77,7 +79,7 @@ class Processor:
         ## Stage 1: Branch Prediction (Predict next rip value)
         prediction = self.predictor.Predict(self.Registers["rip"])
         if self.Registers["rip"] + 1 == prediction: # No branch taken
-            speculative = False 
+            speculative = False # TODO: Bug that predictions from a stall are considered speculative, when they're not..
         else: # Branch taken
             speculative = True # For now, speculative = branch taken
 
@@ -97,7 +99,7 @@ class Processor:
 
         if currentInstruction.endswith('*'):
             speculative = True # If so, will need to be marked in mu-op queue to be marked in ROB
-            currentInstruction.rstrip('*')
+            currentInstruction = currentInstruction.rstrip('*')
         else:
             speculative = False
 
@@ -162,6 +164,7 @@ class Processor:
         if self.isIndirectAddress(mu_op["operand"]):
             mu_op["operand"] = self.AGU.Generate(mu_op["operand"])
 
+        print(mu_op)
         # Stage 2 : Invoke correct subroutine for instruction
         match mu_op["opcode"]:
             case "LOAD":
@@ -186,7 +189,6 @@ class Processor:
     ##-------INSTRUCTION SET-------##
     #------DATA MANIPULATION------#
 
-    """UNTESTED"""
     #-------------
     # LOAD a
     # Load a into rax
@@ -200,7 +202,7 @@ class Processor:
             src = self.Registers[operand]
 
         elif self.isImmediateValue(operand): # Immediate value
-            src = operand
+            src = int(operand.lstrip('#'))
         
         else:
             raise Exception(f"Unexpected error on Load:\n\
@@ -338,8 +340,17 @@ class Processor:
     # SYSCALL
     # Performs a OS call operation (like printing to screen)
     def Syscall(self):
-        print(self.Registers["rsi"])
-        return
+        ## Accepted Syscalls
+        callType = self.Registers["rax"]
+        match callType:
+            ## 1 - Write
+            case 1:
+                print(self.Registers["rsi"])
+                return
+            ## 60 - Exit
+            case 60:
+                self.Flush()
+                return # TODO: Set this up to change a flag in the interrupts register, that then stops the CPU from running
     
     def Call():
         pass
@@ -372,7 +383,9 @@ class Processor:
         except:
             return False
     
-    def isIndirectAddress(self, src: str) -> bool:
+    def isIndirectAddress(self, src: str|int) -> bool:
+        if type(src) is int:
+            return False
         return True if src.startswith("[") and src.endswith("]") else False
 
     def isRegister(self, src: str) -> bool:

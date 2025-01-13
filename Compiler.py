@@ -174,7 +174,7 @@ class Compiler:
         
 
 C = Compiler()
-C.Compile("test.txt")
+C.Compile("test2.txt")
 
 
 

@@ -8,7 +8,7 @@ class BasePredictor:
         
         return programCounter + 1
 
-    def Update():
+    def Update(self):
         pass
     
     # Stall for 1 cycle after branch taken, to ensure first instuction not skipped
