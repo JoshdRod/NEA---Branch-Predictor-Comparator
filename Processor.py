@@ -1,9 +1,9 @@
 """
 TODO:
+- Implement register addresing modes (e.g b, h, etc.) (as can't access registers correctly w/o them)
 - Make processor halt at end of program
 - Remove bugs
 - Change processor operating mode - currently, branch prediction doesn't improve anything, because there's no misfetch penalty
-- Implement register addresing modes (e.g b, h, etc.) (will work without, but need to fix after)
 - Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
 - Fix fact that all computed memory addresses can't contain spaces in the compiler (e.g: Won't accept "[rax + 5]" must be "[rax+5]")
 - A direct CPU interface would be nice (like the IDLE interpreter)
@@ -147,7 +147,7 @@ class Processor:
                 mu_opBuffer.append("STO " + operands[0])
             # jmp/je a -> JMP/JE/..
             case "jmp" | "je" | "jne" | "jg" | "jl" | "jge" | "jle":
-                mu_opBuffer.append("LOAD " + f"#{operands[0]}")
+                mu_opBuffer.append("LOAD " + operands[0])
                 mu_opBuffer.append("JMP " + opcode.lstrip('j')) # e.g: JMP e / JMP ne / JMP g / JMP l / JMP mp (unconditional)
             # inc/dec a -> LOAD a, ADD/SUB 1, STO a
             case "inc" | "dec":
@@ -190,8 +190,8 @@ class Processor:
         # Stage 1 : Get next mu-op in pipeline buffer
         mu_op = self.pipelineBuffer.Get()
 
-        # Stage 2 : If operand is a pre-indexed address, convert to memory address
-        if self.isIndirectAddress(mu_op["operand"]):
+        # Stage 2 : If operand is a memory address, run through AGU to calculate mem address to access
+        if self.isMemoryAddress(mu_op["operand"]):
             mu_op["operand"] = self.AGU.Generate(mu_op["operand"])
 
         # Stage 2 : Invoke correct subroutine for instruction
@@ -233,7 +233,7 @@ class Processor:
             src = self.Registers[operand]
 
         elif self.isImmediateValue(operand): # Immediate value
-            src = int(operand.lstrip('#'))
+            src = operand
         
         else:
             raise Exception(f"Unexpected error on Load:\n\
@@ -274,7 +274,7 @@ class Processor:
             value = self.Registers[operand]
 
         elif self.isImmediateValue(operand):
-            value = operand.lstrip('#')
+            value = operand
         
         else:
             raise Exception(f"Unexpected value to add:\n\
@@ -311,7 +311,7 @@ class Processor:
             subtrahend = self.Registers[operand]
 
         elif self.isImmediateValue(operand): # Immediate value
-            subtrahend = operand.lstrip('#')
+            subtrahend = operand
         
         else:
             raise Exception(f"Unexpected minuend:\n\
@@ -408,22 +408,16 @@ class Processor:
         self.Registers["cir"] = 0
 
     def isMemoryAddress(self, src: str) -> bool:
-        try:
-            int(src)
-            return True
-        except:
-            return False
-    
-    def isIndirectAddress(self, src: str|int) -> bool:
         if type(src) is int:
             return False
         return True if src.startswith("[") and src.endswith("]") else False
 
     def isRegister(self, src: str) -> bool:
+        if type(src) is int:
+            return False
         return src.startswith('r')
-    
-    def isImmediateValue(self, src: str) -> bool:
-        return src.startswith('#')
-
+        
+    def isImmediateValue(self, src: int) -> bool:
+        return True if type(src) is int else False
 P = Processor()
 P.Compute()

@@ -3,18 +3,18 @@ class AGU:
         self.Registers = registers
 
     """
-    Converts an indirect Address into a memory address value
+    Converts an direct/indirect address into a memory address value
     (e.g: [rbx+rcx+5] -> 15 (when rbx = 8 and rcx = 2))
-    INPUTS: str indirect address ([rbx+rcx+5])
+    INPUTS: str address ([rbx+rcx+5])
     RETURNS: int memory address (15) 
     """
-    def Generate(self, indirectAddress: str) -> int:
+    def Generate(self, address: str) -> int:
         operators = {'+': 0, # In operator : prescedence pairs
                      '-': 0,
                      '*': 1,
                      '/': 1}
         # Strip []s, remove spaces
-        rawInfixExpression = "".join(filter(lambda x: x != ' ',indirectAddress.strip("[]")))
+        rawInfixExpression = "".join(filter(lambda x: x != ' ', address.strip("[]")))
         # Split operators and values into list (e.g: ['rax', '+', '15'])
         infixExpression = ['']
         for char in rawInfixExpression:
