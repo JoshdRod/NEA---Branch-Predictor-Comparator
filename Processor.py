@@ -1,9 +1,9 @@
 """
 TODO:
-- Implement pipeline flushing method
-- Implement register addresing modes (e.g b, h, etc.)
 - Make processor halt at end of program
 - Remove bugs
+- Change processor operating mode - currently, branch prediction doesn't improve anything, because there's no misfetch penalty
+- Implement register addresing modes (e.g b, h, etc.) (will work without, but need to fix after)
 - Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
 - Fix fact that all computed memory addresses can't contain spaces in the compiler (e.g: Won't accept "[rax + 5]" must be "[rax+5]")
 - A direct CPU interface would be nice (like the IDLE interpreter)
@@ -60,14 +60,42 @@ class Processor:
                 "cir": 0 # Current Instruction register (Can't find any documentation on this - might be bc you can't change its value programatically?)
                 }
 
+    DEBUG = {"decoded-micro-ops": None,
+            "executed-micro-ops": None}
+    
     def Compute(self):
         executable = ['mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 4', 'cmp rdi rbp', 'je 16', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 10', 'jmp 14', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 14', 'inc rdi', 'jmp 4', 'dec rbp', 'cmp rbx rbp', 'je 21', 'mov rdi rbx', 'jmp 4', 'mov rax 1', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'syscall', 'mov rax 60', 'mov rdi 0', 'syscall', '81', '77', '68', '69', '74', '65']
         for index, line in enumerate(executable):
             self.mainMemory.Store(index, line)
+        
+        cycleNumber = 0
         while True:
             self.Fetch()
             self.Decode()
             self.Execute()
+
+            print(f"""
+                  
+   -----------------------CYCLE {cycleNumber}-----------------------
+                  PROGRAM COUNTER: {self.Registers["rip"]}
+                  Fetched: {self.Registers["cir"]} from location: {self.Registers["mar"]}.
+                  Decoded: {self.Registers["cir"]} into micro-ops: {self.DEBUG["decoded-micro-ops"]}.
+                  Executed: {self.DEBUG["executed-micro-ops"]}.
+                  
+                  Pipeline: {self.pipelineBuffer._Buffer}
+                  (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
+
+                  Re-Order Buffer: {self.reorderBuffer._Buffer}
+                  (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
+
+                  Registers: {self.Registers.items()}
+
+                  Main Memory: {self.mainMemory.__data__}
+
+                  NEXT CYCLE?
+                  """)
+            input()
+            
 
 
     ##-------PIPELINE STAGES-------##
@@ -156,6 +184,8 @@ class Processor:
         self.reorderBuffer.Add(mu_opBuffer)
         self.pipelineBuffer.Add(mu_opBuffer)
 
+        self.DEBUG["decoded-micro-ops"] = mu_opBuffer
+
     def Execute(self):
         # Stage 1 : Get next mu-op in pipeline buffer
         mu_op = self.pipelineBuffer.Get()
@@ -164,7 +194,6 @@ class Processor:
         if self.isIndirectAddress(mu_op["operand"]):
             mu_op["operand"] = self.AGU.Generate(mu_op["operand"])
 
-        print(mu_op)
         # Stage 2 : Invoke correct subroutine for instruction
         match mu_op["opcode"]:
             case "LOAD":
@@ -185,6 +214,8 @@ class Processor:
         # Stage 3 : Remove mu-op from pipeline buffer + ROB
         self.pipelineBuffer.Remove()
         self.reorderBuffer.Remove()
+
+        self.DEBUG["executed-micro-ops"] = mu_op
 
     ##-------INSTRUCTION SET-------##
     #------DATA MANIPULATION------#
