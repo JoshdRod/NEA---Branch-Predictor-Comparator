@@ -358,9 +358,10 @@ class Processor:
         # Take next mu-op
         nextMu_op = self.reorderBuffer.Get(1)
 
-        # If mu-op prediction and actual result don't match up, flush pipline
+        # If mu-op prediction and actual result don't match up, flush pipline and reset rip
         if comparisonMet != nextMu_op["speculative"]:
             self.Flush()
+            self.Registers["rip"] = self.Registers["rax"]
 
         # Update (and stall for 1 cycle) branch predictor with result
         self.predictor.Update()
