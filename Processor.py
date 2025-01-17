@@ -13,52 +13,17 @@ from MainMemory import MainMemory
 import DirectionPredictors
 from Buffers import ReorderBuffer, PipelineBuffer
 from AddressGenerationUnit import AGU
+from Registers import Registers
 
 class Processor:
 
     def __init__(self):
         self.predictor = DirectionPredictors.BasePredictor() # TODO
+        self.registers = Registers()
         self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
         self.AGU = AGU(self.Registers)
-
-    ##-------REGISTERS-------##
-    Registers = {
-                #--CALLEE-OWNED--#
-                "rax": 0, # Accumulator / Return value
-                "rdi": 0, # 1st arg
-                "rsi": 0, # 2nd arg
-                "rdx": 0, # 3rd arg
-                "rcx": 0, # 4th arg
-                "r8": 0, # 5th arg
-                "r9": 0, # 6th arg
-                "r10": 0, # temp
-                "r11": 0, # temp
-                #--CALLER-OWNED (local vars)--#
-                "rbx": 0, 
-                "rbp": 0,
-                "r12": 0,
-                "r13": 0,
-                "r14": 0,
-                "r15": 0,
-                #--Address Registers--#
-                "rsp": 0, # Stack pointer - caller-owned
-
-                # Status/condition code bits - used to store result of comp operations
-                "eflags": {
-                           'PF': 0, # Parity Flag - Indicates result of previous operation was odd (0) or even (1)
-                           'ZF': 0, # Zero Flag - Indicates result of previous operation was 0
-                           'SF': 0, # Sign Flag - Indicates result of previous operation was negative
-                           #CF, OF, AF Only needed if compaisons are done between binary numbers 
-                           }, 
-
-                #--INTERNAL REGISTERS--#
-                "rip": 0, # Instruction pointer (Program Counter)
-                "mbr": 0, # Memory Buffer Register
-                "mar": 0, # Memory Address Register
-                "cir": 0 # Current Instruction register (Can't find any documentation on this - might be bc you can't change its value programatically?)
-                }
 
     DEBUG = {"decoded-micro-ops": None,
             "executed-micro-ops": None}
