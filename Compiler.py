@@ -34,6 +34,7 @@ class Compiler:
             # Remove all db/dw/dq, for now
             data = list(filter(lambda x: not x in ["db", "dw", "dd", "dq", "dt"], data))
 
+
             # Generate a list of pointers in data section, and their locations
             dataPointers = []
             for index, token in enumerate(data):
@@ -43,6 +44,9 @@ class Compiler:
                                          "location": index,
                                          "section": "data"})
                     data.pop(index)
+            
+            # Convert all data values to ints
+            data = list(map(int, data))
 
             ##TEXT SECTION
             # Find the start and end of the text section
