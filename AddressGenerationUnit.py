@@ -47,7 +47,7 @@ class AGU:
             else:
                 # If token is register, find its value
                 if token.startswith('r'):
-                    operand = self.Registers[token] 
+                    operand = self.Registers[token] # TODO: CONVERT TO OOP NOTATION
                 # If immediate value, convert to int
                 else:
                     operand = int(token)

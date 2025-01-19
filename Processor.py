@@ -266,15 +266,22 @@ class Processor:
     # Changes flags in eflags based on a comparison between minuend and subtrahend
     #-------------
     def Compare(self, operand: list):
-        # Retrieve minuend
-        minuend = self.registers.Load("rax")
-        
+        # Retrieve minuend, convert from list of bytes to int
+        minuend = 0
+        rax = self.registers.Load("rax")
+        for index, byte in enumerate(rax):
+            minuend += byte * 2**index
+
         # Retrieve Subtrahend
         if self.isMemoryAddress(operand):
             subtrahend = self.mainMemory.Retrieve(operand)
 
         elif self.isRegister(operand):
-            subtrahend = self.registers.Load(operand)
+            # Convert from list of bytes to int
+            subtrahend = 0
+            register = self.registers.Load(operand)
+            for index, byte in enumerate(register):
+                subtrahend += byte * 2**index
 
         elif self.isImmediateValue(operand): # Immediate value
             subtrahend = operand
@@ -377,8 +384,8 @@ class Processor:
         self.pipelineBuffer.Flush()
         # Clear mar, mbr, cir
         self.registers.Store("mar", 0)
-        self.registers.Store("mbr", 0)
-        self.registers.Store("cir", 0)
+        self.registers.Store("mbr", '')
+        self.registers.Store("cir", '')
 
     def isMemoryAddress(self, src: str) -> bool:
         if type(src) is int:
