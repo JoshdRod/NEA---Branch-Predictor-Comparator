@@ -6,7 +6,7 @@ class AGU:
     Converts an direct/indirect address into a memory address value
     (e.g: [rbx+rcx+5] -> 15 (when rbx = 8 and rcx = 2))
     INPUTS: str address ([rbx+rcx+5])
-    RETURNS: int memory address (15) 
+    RETURNS: str memory address ([15]) 
     """
     def Generate(self, address: str) -> int:
         operators = {'+': 0, # In operator : prescedence pairs
@@ -45,9 +45,16 @@ class AGU:
 
             # If non-operator,
             else:
-                # If token is register, find its value
-                if token.startswith('r'):
-                    operand = self.Registers[token] # TODO: CONVERT TO OOP NOTATION
+                # If token is register, find its value, and convert from list to int
+                if token.startswith('r') or token.startswith('e'):
+                    operand = 0
+                    register = self.Registers.Load(token)
+                    if type(register) == int:
+                        operand = register
+                    else:
+                        for index, byte in enumerate(register):
+                            operand += byte * 2**index
+
                 # If immediate value, convert to int
                 else:
                     operand = int(token)
@@ -79,5 +86,5 @@ class AGU:
                 operandStack.append(result)
         # Final item in stack = address
         generatedAddress = operandStack[0]
-        return generatedAddress
+        return f"[{generatedAddress}]"
         

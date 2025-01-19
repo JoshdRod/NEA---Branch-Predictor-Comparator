@@ -115,8 +115,8 @@ class PipelineBuffer(Buffer):
         super().__init__(size, name)
 
     # Expected input: mu-op, w/ a * at end if it's speculative
-    def CreateBufferItem(self, item: str) -> dict:
-        bufferItem = {"opcode": None, "operand": None}
+    def CreateBufferItem(self, item: str, operandSize: int) -> dict:
+        bufferItem = {"opcode": None, "operand": None, "operandSize": operandSize} # operandSize is the no. bytes the operation involves (e.g: In MOV [10] r10b, the mu_op STO [10] has an operand size of 1 byte)
 
         decomposedMu_op = item.split()
         match len(decomposedMu_op):

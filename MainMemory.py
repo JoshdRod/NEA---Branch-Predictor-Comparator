@@ -11,7 +11,7 @@ class MainMemory:
     """
     def Retrieve(self, location: str) -> str: 
         try:
-            location = int(location)
+            location = int(location.strip('[]'))
             return self.__data__[location]
         except:
             raise Exception(f"Tried to access invalid memory location:\n\
@@ -23,7 +23,7 @@ class MainMemory:
     """
     def Store(self, location: str, value: int):
         try:
-            location = int(location)
+            location = int(location.strip('[]'))
             self.__data__[location] = value
         except:
             raise Exception(f"Error trying to store data:\n\

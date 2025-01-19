@@ -29,9 +29,9 @@ class Processor:
             "executed-micro-ops": None}
     
     def Compute(self):
-        executable = ['mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 4', 'cmp rdi rbp', 'je 16', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 10', 'jmp 14', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 14', 'inc rdi', 'jmp 4', 'dec rbp', 'cmp rbx rbp', 'je 21', 'mov rdi rbx', 'jmp 4', 'mov rax 1', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'syscall', 'mov rax 60', 'mov rdi 0', 'syscall', '81', '77', '68', '69', '74', '65']
+        executable = ['mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 4', 'cmp rdi rbp', 'je 16', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 10', 'jmp 14', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 14', 'inc rdi', 'jmp 4', 'dec rbp', 'cmp rbx rbp', 'je 21', 'mov rdi rbx', 'jmp 4', 'mov rax 1', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'syscall', 'mov rax 60', 'mov rdi 0', 'syscall', 81, 77, 68, 69, 74, 65]
         for index, line in enumerate(executable):
-            self.mainMemory.Store(index, line)
+            self.mainMemory.Store(f"[{index}]", line)
         
         cycleNumber = 0
         while True:
@@ -78,7 +78,7 @@ class Processor:
 
         ## Stages 2 - 4: Put instruction into cir
         self.registers.Store("mar", self.registers.Load("rip"))
-        self.registers.Store("mbr", self.mainMemory.Retrieve(self.registers.Load("marb")))
+        self.registers.Store("mbr", self.mainMemory.Retrieve(f"[{self.registers.Load("marb")}]"))
 
         if speculative: # Denote to decoder that mu-ops should be marked as speculative in ROB (by putting a * at end of instruction)
             self.registers.Store("cir", f"{self.registers.Load("mbr")}*")
@@ -103,6 +103,26 @@ class Processor:
         # Match opcode to set of mu-ops
         opcode = decomposedInstruction[0]
         operands = decomposedInstruction[1:]
+
+        # Determine size of operands
+        size = 8 # 8 bytes = 64 bit
+        for op in operands:
+            match op[-1]:
+                case 'b':
+                    size = 1
+                    break
+                case 'w':
+                    if size > 2:
+                        size = 2
+                case 'l':
+                    if size > 4:
+                        size = 4
+                case 'q':
+                    continue
+                case _:
+                    continue
+
+        ##TODO: FINISH APPENDING OPERAND SIZES TO END OF MU_OPS (so that processor knows how many mem. addresses to change in a STO)
 
         mu_opBuffer = []
         match opcode:
@@ -280,8 +300,11 @@ class Processor:
             # Convert from list of bytes to int
             subtrahend = 0
             register = self.registers.Load(operand)
-            for index, byte in enumerate(register):
-                subtrahend += byte * 2**index
+            if type(register) is int:
+                subtrahend = register
+            else:
+                for index, byte in enumerate(register):
+                    subtrahend += byte * 2**index
 
         elif self.isImmediateValue(operand): # Immediate value
             subtrahend = operand
