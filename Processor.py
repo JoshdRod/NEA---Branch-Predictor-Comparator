@@ -23,7 +23,7 @@ class Processor:
         self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
-        self.AGU = AGU(self.Registers)
+        self.AGU = AGU(self.registers)
 
     DEBUG = {"decoded-micro-ops": None,
             "executed-micro-ops": None}
@@ -42,9 +42,9 @@ class Processor:
             print(f"""
                   
    -----------------------CYCLE {cycleNumber}-----------------------
-                  PROGRAM COUNTER: {self.Registers["rip"]}
-                  Fetched: {self.Registers["cir"]} from location: {self.Registers["mar"]}.
-                  Decoded: {self.Registers["cir"]} into micro-ops: {self.DEBUG["decoded-micro-ops"]}.
+                  PROGRAM COUNTER: {self.registers.Load("rip")}
+                  Fetched: {self.registers.Load("cir")} from location: {self.registers.Load("mar")}.
+                  Decoded: {self.registers.Load("cir")} into micro-ops: {self.DEBUG["decoded-micro-ops"]}.
                   Executed: {self.DEBUG["executed-micro-ops"]}.
                   
                   Pipeline: {self.pipelineBuffer._Buffer}
@@ -53,7 +53,7 @@ class Processor:
                   Re-Order Buffer: {self.reorderBuffer._Buffer}
                   (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
 
-                  Registers: {self.Registers.items()}
+                  Registers: {self.registers.Registers.items()}
 
                   Main Memory: {self.mainMemory.__data__}
 
@@ -64,31 +64,31 @@ class Processor:
 
 
     ##-------PIPELINE STAGES-------##
-    
-    def Prefetch(): # What happens in prefetching? Is it just prediction? (Can I get away with saying it's just prediction?)
-        pass
 
     def Fetch(self):
         ## Stage 1: Branch Prediction (Predict next rip value)
-        prediction = self.predictor.Predict(self.Registers["rip"])
-        if self.Registers["rip"] + 1 == prediction: # No branch taken
+        rip = self.registers.Load("ripb") # As only first byte contains instruction pointer (bodge as rip is an 8 byte int on a cpu that only deals with 1 byte ints)
+        prediction = self.predictor.Predict(rip)
+        if rip + 1 == prediction: # No branch taken
             speculative = False # TODO: Bug that predictions from a stall are considered speculative, when they're not..
         else: # Branch taken
             speculative = True # For now, speculative = branch taken
 
-        self.Registers["rip"] = prediction
+        self.registers.Store("rip", prediction)
 
         ## Stages 2 - 4: Put instruction into cir
-        self.Registers["mar"] = self.Registers["rip"]
-        self.Registers["mbr"] = self.mainMemory.Retrieve(self.Registers["mar"])
-        self.Registers["cir"] = self.Registers["mbr"]
+        self.registers.Store("mar", self.registers.Load("rip"))
+        self.registers.Store("mbr", self.mainMemory.Retrieve(self.registers.Load("marb")))
 
-        if speculative: self.Registers["cir"] += '*' # Denotes to decoder that mu-ops should be marked as speculative in ROB
+        if speculative: # Denote to decoder that mu-ops should be marked as speculative in ROB (by putting a * at end of instruction)
+            self.registers.Store("cir", f"{self.registers.Load("mbr")}*")
+        else:
+            self.registers.Store("cir", self.registers.Load("mbr"))
 
     def Decode(self):
         # TODO: Return if nothing in cir
         ## Stage 0 (*): Determine if instruction is speculative
-        currentInstruction = self.Registers["cir"]
+        currentInstruction = self.registers.Load("cir")
 
         if currentInstruction.endswith('*'):
             speculative = True # If so, will need to be marked in mu-op queue to be marked in ROB
@@ -195,7 +195,7 @@ class Processor:
             src = self.mainMemory.Retrieve(operand)
 
         elif self.isRegister(operand):
-            src = self.Registers[operand]
+            src = self.registers.Load(operand)
 
         elif self.isImmediateValue(operand): # Immediate value
             src = operand
@@ -204,7 +204,7 @@ class Processor:
             raise Exception(f"Unexpected error on Load:\n\
                             Operand: {operand}")
         # rax <- src
-        self.Registers["rax"] = int(src)
+        self.registers.Store("rax", src)
 
     
     #-------------
@@ -212,13 +212,13 @@ class Processor:
     # Store value of rax in location a
     #-------------
     def Store(self, operand: int|str):
-        value = self.Registers["rax"]
+        value = self.registers.Load("rax")
         # Find location to store
         if self.isMemoryAddress(operand):
             self.mainMemory.Store(operand, value)
 
         elif self.isRegister(operand):
-            self.Registers[operand] = value
+            self.registers.Store(operand, value)
 
         else:
             raise Exception(f"Unexpected location in Store operation:\n\
@@ -236,7 +236,7 @@ class Processor:
             value = self.mainMemory.Retrieve(operand)
         
         elif self.isRegister(operand):
-            value = self.Registers[operand]
+            value = self.registers.Load(operand)
 
         elif self.isImmediateValue(operand):
             value = operand
@@ -247,7 +247,8 @@ class Processor:
         
         # Add value to rax
         try:
-            self.Registers["rax"] += int(value)
+            self.registers.Store("rax", self.registers.Load("rax") + int(value))
+
         except:
             raise Exception(f"Couldn't add operand\n\
                             Operand: {operand} -> {value}, which could not be cast as int")
@@ -266,14 +267,14 @@ class Processor:
     #-------------
     def Compare(self, operand: list):
         # Retrieve minuend
-        minuend = self.Registers["rax"]
+        minuend = self.registers.Load("rax")
         
         # Retrieve Subtrahend
         if self.isMemoryAddress(operand):
             subtrahend = self.mainMemory.Retrieve(operand)
 
         elif self.isRegister(operand):
-            subtrahend = self.Registers[operand]
+            subtrahend = self.registers.Load(operand)
 
         elif self.isImmediateValue(operand): # Immediate value
             subtrahend = operand
@@ -283,12 +284,17 @@ class Processor:
                             Operand: {operand}")
 
         difference = minuend - int(subtrahend)
+
+        ## Modify eflags based on changes
+        eflags = self.registers.Load("eflags")
         # SF = 1 if difference < 0
-        self.Registers["eflags"]["SF"] = 1 if difference < 0 else 0
+        eflags["SF"] = 1 if difference < 0 else 0
         # ZF = 1 if difference = 0
-        self.Registers["eflags"]["ZF"] = 1 if difference == 0 else 0
+        eflags["ZF"] = 1 if difference == 0 else 0
         # PF = 1 if difference = even
-        self.Registers["eflags"]["PF"] = 1 if difference % 2 == 0 else 0
+        eflags["PF"] = 1 if difference % 2 == 0 else 0
+
+        self.registers.Store("eflags", eflags)
 
         return
     
@@ -300,25 +306,26 @@ class Processor:
     def Jump(self, operand: int|str):
         # Check if comparison condition is met in eflags
         # JMP e / JMP ne / JMP g / JMP l / JMP ge / JMP le / JMP mp
+        eflags = self.registers.Load("eflags")
         match operand:
             case 'e':
-                comparisonMet = self.Registers["eflags"]["ZF"]
+                comparisonMet = eflags["ZF"]
             case "ne":
-                comparisonMet = not self.Registers["eflags"]["ZF"]
+                comparisonMet = not eflags["ZF"]
             case 'g':
-                comparisonMet = self.Registers["eflags"]["SF"]
+                comparisonMet = eflags["SF"]
             case 'l':
-                comparisonMet = not self.Registers["eflags"]["SF"]
+                comparisonMet = not eflags["SF"]
             case "ge":
-                comparisonMet = self.Registers["eflags"]["SF"] or self.Registers["eflags"]["ZF"]
+                comparisonMet = eflags["SF"] or eflags["ZF"]
             case "le":
-                comparisonMet = not self.Registers["eflags"]["SF"] or self.Registers["eflags"]["ZF"] # Seems to logically be LE
+                comparisonMet = not eflags["SF"] or eflags["ZF"] # Seems to logically be LE
             case "mp":
                 comparisonMet = True
 
         # If met, next fetch location = rax
         if comparisonMet:
-            nextFetchLocation = self.Registers["rax"]
+            nextFetchLocation = self.registers.Load("rax")
 
         # Take next mu-op
         nextMu_op = self.reorderBuffer.Get(1)
@@ -326,7 +333,7 @@ class Processor:
         # If mu-op prediction and actual result don't match up, flush pipline and reset rip
         if comparisonMet != nextMu_op["speculative"]:
             self.Flush()
-            self.Registers["rip"] = self.Registers["rax"]
+            self.registers.Store("rip", self.registers.Load("rax"))
 
         # Update (and stall for 1 cycle) branch predictor with result
         self.predictor.Update()
@@ -338,11 +345,11 @@ class Processor:
     # Performs a OS call operation (like printing to screen)
     def Syscall(self):
         ## Accepted Syscalls
-        callType = self.Registers["rax"]
+        callType = self.registers.Load("rax")
         match callType:
             ## 1 - Write
             case 1:
-                print(self.Registers["rsi"])
+                print(self.registers.Load("rsi"))
                 return
             ## 60 - Exit
             case 60:
@@ -369,9 +376,9 @@ class Processor:
         self.reorderBuffer.Flush()
         self.pipelineBuffer.Flush()
         # Clear mar, mbr, cir
-        self.Registers["mar"] = 0
-        self.Registers["mbr"] = 0
-        self.Registers["cir"] = 0
+        self.registers.Store("mar", 0)
+        self.registers.Store("mbr", 0)
+        self.registers.Store("cir", 0)
 
     def isMemoryAddress(self, src: str) -> bool:
         if type(src) is int:
@@ -381,7 +388,7 @@ class Processor:
     def isRegister(self, src: str) -> bool:
         if type(src) is int:
             return False
-        return src.startswith('r')
+        return src.startswith('r') or src.startswith('e')
         
     def isImmediateValue(self, src: int) -> bool:
         return True if type(src) is int else False
