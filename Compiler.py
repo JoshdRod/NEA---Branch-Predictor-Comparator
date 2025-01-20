@@ -64,10 +64,15 @@ class Compiler:
             # Create Symbol Table
             self.GenerateSymbolTable(dataPointers + labels) # Generate symbol table
 
+            ## HEADER SECTION
+            # Used for ensuring rip doesn't go into data section
+            header = [2, # Start of text section
+                      2 + len(text) # Start of data section
+                     ]
             # Generate executable file
-            self.Offsets = {"text": 0,
+            self.Offsets = {"text": 2,
                             "data": len(text)}
-            executable = text + data # text section, then data section
+            executable = header + text + data # header, then text section, then data section
 
             # Final pass - remove symbols
             executable = list(map(self.ReplaceSymbols, executable))

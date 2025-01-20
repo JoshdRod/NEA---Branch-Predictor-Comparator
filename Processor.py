@@ -1,6 +1,5 @@
 """
 TODO:
-- Implement register addresing modes (e.g b, h, etc.) (as can't access registers correctly w/o them)
 - Make processor halt at end of program
 - Remove bugs
 - Change processor operating mode - currently, branch prediction doesn't improve anything, because there's no misfetch penalty
@@ -26,40 +25,56 @@ class Processor:
         self.AGU = AGU(self.registers)
 
     DEBUG = {"decoded-micro-ops": None,
-            "executed-micro-ops": None}
+            "executed-micro-ops": {"opcode": None,
+                                   "operand": None,
+                                   "operandSize": None}}
     
     def Compute(self):
-        executable = ['mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 4', 'cmp rdi rbp', 'je 16', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 10', 'jmp 14', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 14', 'inc rdi', 'jmp 4', 'dec rbp', 'cmp rbx rbp', 'je 21', 'mov rdi rbx', 'jmp 4', 'mov rax 1', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'syscall', 'mov rax 60', 'mov rdi 0', 'syscall', 81, 77, 68, 69, 74, 65]
+        executable = [2, 31, 'mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 6', 'cmp rdi rbp', 'je 18', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 12', 'jmp 16', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 16', 'inc rdi', 'jmp 6', 'dec rbp', 'cmp rbx rbp', 'je 23', 'mov rdi rbx', 'jmp 6', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'mov rax 1', 'syscall', 'mov rdi 0', 'mov rax 60', 'syscall', 81, 77, 68, 69, 74, 65]
+        # Stage 1 - Move executable into memory
         for index, line in enumerate(executable):
             self.mainMemory.Store(f"[{index}]", line)
         
+        # Stage 2 - Assign start of text/data section to segment registers
+        self.registers.Store("cs", self.mainMemory.Retrieve(f"[0]"))
+        self.registers.Store("ds", self.mainMemory.Retrieve(f"[1]"))
+
+        # Stage 3 - Assign rip to start of text section
+        self.registers.Store("ripw", self.registers.Load("cs")) # w, as cs is 2 bytes
+        
         cycleNumber = 0
+        filterOpcode = None
         while True:
             self.Fetch()
             self.Decode()
             self.Execute()
 
-            print(f"""
-                  
-   -----------------------CYCLE {cycleNumber}-----------------------
-                  PROGRAM COUNTER: {self.registers.Load("rip")}
-                  Fetched: {self.registers.Load("cir")} from location: {self.registers.Load("mar")}.
-                  Decoded: {self.registers.Load("cir")} into micro-ops: {self.DEBUG["decoded-micro-ops"]}.
-                  Executed: {self.DEBUG["executed-micro-ops"]}.
-                  
-                  Pipeline: {self.pipelineBuffer._Buffer}
-                  (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
+            if self.DEBUG["executed-micro-ops"]["opcode"] == filterOpcode or filterOpcode == None:
+                if filterOpcode is not None:
+                    filterOpcode = None
 
-                  Re-Order Buffer: {self.reorderBuffer._Buffer}
-                  (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
+                print(f"""
+    -----------------------CYCLE {cycleNumber}-----------------------
+                    PROGRAM COUNTER: {self.registers.Load("rip")}
+                    Fetched: {self.registers.Load("cir")} from location: {self.registers.Load("mar")}.
+                    Decoded: {self.registers.Load("cir")} into micro-ops: {self.DEBUG["decoded-micro-ops"]}.
+                    Executed: {self.DEBUG["executed-micro-ops"]}.
+                    
+                    Pipeline: {self.pipelineBuffer._Buffer}
+                    (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
 
-                  Registers: {self.registers.Registers.items()}
+                    Re-Order Buffer: {self.reorderBuffer._Buffer}
+                    (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
 
-                  Main Memory: {self.mainMemory.__data__}
+                    Registers: {self.registers.Registers.items()}
 
-                  NEXT CYCLE?
-                  """)
-            input()
+                    Main Memory: {self.mainMemory.__data__}
+
+                    NEXT CYCLE? (S to set breakpoint on next opcode)
+                    """)
+                if input() == 'S':
+                    filterOpcode = input("Enter opcode to set breakpoint on: ")
+
             cycleNumber += 1
             
 
@@ -79,7 +94,12 @@ class Processor:
 
         ## Stages 2 - 4: Put instruction into cir
         self.registers.Store("mar", self.registers.Load("rip"))
-        self.registers.Store("mbr", self.mainMemory.Retrieve(f"[{self.registers.Load("marb")}]"))
+
+        # Check rip value is within text section
+        if prediction < self.registers.Load("csb") or prediction >= self.registers.Load("dsb"):
+            self.registers.Store("mbr", "noop")
+        else:
+            self.registers.Store("mbr", self.mainMemory.Retrieve(f"[{self.registers.Load("marb")}]"))
 
         if speculative: # Denote to decoder that mu-ops should be marked as speculative in ROB (by putting a * at end of instruction)
             self.registers.Store("cir", f"{self.registers.Load("mbr")}*")
@@ -147,6 +167,9 @@ class Processor:
             # syscall -> syscall
             case "syscall":
                 mu_opBuffer.append("SYSCALL")
+            # noop -> NOOP
+            case "noop":
+                mu_opBuffer.append("NOOP")
             case _:
                 raise Exception(f"Invalid operation recieved: {opcode}")
         
@@ -196,6 +219,8 @@ class Processor:
                 self.Compare(mu_op["operand"])
             case "SYSCALL":
                 self.Syscall() # Syscall doesn't take an operand
+            case "NOOP":
+                pass # No operation
             
         # Stage 3 : Remove mu-op from pipeline buffer + ROB
         self.pipelineBuffer.Remove()
@@ -398,7 +423,7 @@ class Processor:
     # Performs a OS call operation (like printing to screen)
     def Syscall(self):
         ## Accepted Syscalls
-        callType = self.registers.Load("rax")
+        callType = self.registers.Load("raxb")
         match callType:
             ## 1 - Write
             case 1:
