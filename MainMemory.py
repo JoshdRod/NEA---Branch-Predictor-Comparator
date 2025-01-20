@@ -19,12 +19,18 @@ class MainMemory:
     
     """
     Stores data in memory
-    INPUTS: str location to store in, int value to store
+    INPUTS: str location to store in, int/str value to store/list of register values to store
     """
-    def Store(self, location: str, value: int):
+    def Store(self, location: str, value: list|int|str):
         try:
+            # Find location to store in
             location = int(location.strip('[]'))
-            self.__data__[location] = value
+            # Store value(s)
+            if type(value) == int or type(value) == str:
+                self.__data__[location] = value
+            else:
+                for i in range(len(value)):
+                    self.__data__[location+i] = value[i]
         except:
             raise Exception(f"Error trying to store data:\n\
                             Tried to store {value} at {location}")

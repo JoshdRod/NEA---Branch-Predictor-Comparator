@@ -43,13 +43,13 @@ class Buffer:
 
     """
     Adds item to end of buffer
-    INPUTS: str item / list ofitems
+    INPUTS: str item / list ofitems, int size of operation (bytes)
     """
-    def Add(self, item: str|list):
+    def Add(self, item: str|list, size: int):
         # If given list of items, add them all iteratively
         if type(item) == list:
             for i in item:
-                self.Add(i)
+                self.Add(i, size)
             return # Recursion isn't very KISS here, use iteration
         
         # If a single item, add to buffer
@@ -62,7 +62,7 @@ class Buffer:
             self._frontPointer = 0
         
         # Create item to add to buffer
-        bufferItem = self.CreateBufferItem(item)
+        bufferItem = self.CreateBufferItem(item, size)
 
         # Add buffer item to end of buffer
         self._rearPointer = (self._rearPointer + 1) % 16
@@ -104,7 +104,7 @@ class ReorderBuffer(Buffer):
     def __init__(self, size: int = 16, name: str = "ROB"):
         super().__init__(size, name) # super() calls the method on the superclass
         
-    def CreateBufferItem(self, item: str) -> dict:
+    def CreateBufferItem(self, item: str, size: int) -> dict:
         bufferItem = {"opcode": item.split()[0].rstrip('*'),
                       "speculative": item.endswith('*')} # * at end indicates BP predicted branch taken 
         return bufferItem

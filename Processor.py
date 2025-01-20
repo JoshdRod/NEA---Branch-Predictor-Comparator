@@ -60,6 +60,7 @@ class Processor:
                   NEXT CYCLE?
                   """)
             input()
+            cycleNumber += 1
             
 
 
@@ -166,8 +167,8 @@ class Processor:
         # TODO: This really does NOT seem very DRY
 
         # Insert mu-ops into ROB and pipeline buffer
-        self.reorderBuffer.Add(mu_opBuffer)
-        self.pipelineBuffer.Add(mu_opBuffer)
+        self.reorderBuffer.Add(mu_opBuffer, size)
+        self.pipelineBuffer.Add(mu_opBuffer, size)
 
         self.DEBUG["decoded-micro-ops"] = mu_opBuffer
 
@@ -232,7 +233,20 @@ class Processor:
     # Store value of rax in location a
     #-------------
     def Store(self, operand: int|str):
-        value = self.registers.Load("rax")
+        operandSize = self.pipelineBuffer.Get()["operandSize"]
+        match operandSize:
+            case 1:
+                address = "raxb"
+            case 2:
+                address = "raxw"
+            case 4:
+                address = "raxl"
+            case 8:
+                address = "raxq"
+            case _:
+                raise Exception(f"Invalid operand size specified: Expected 1, 2, 4, or 8, got {operandSize}")
+            
+        value = self.registers.Load(address)
         # Find location to store
         if self.isMemoryAddress(operand):
             self.mainMemory.Store(operand, value)
@@ -267,7 +281,16 @@ class Processor:
         
         # Add value to rax
         try:
-            self.registers.Store("rax", self.registers.Load("rax") + int(value))
+            rax = self.registers.Load("rax")
+            # If int, just add to lowest byte of rax
+            if type(value) == int:
+                rax[0] += value
+            # If list, add each element of value to rax in correct index
+            else:
+                for i in range(len(value)):
+                    rax[i] += value[i]
+
+            self.registers.Store("rax", rax)
 
         except:
             raise Exception(f"Couldn't add operand\n\
@@ -411,7 +434,7 @@ class Processor:
         self.registers.Store("cir", '')
 
     def isMemoryAddress(self, src: str) -> bool:
-        if type(src) is int:
+        if type(src) is not str:
             return False
         return True if src.startswith("[") and src.endswith("]") else False
 
