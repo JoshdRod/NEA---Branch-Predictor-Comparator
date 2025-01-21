@@ -77,11 +77,13 @@ class Buffer:
             return
         
         # Remove item at front of buffer
-        self._frontPointer = (self._frontPointer + 1) % 16
-
         # If queue now empty, set front and end pointers to -1
-        if self._frontPointer > self._rearPointer:
+        if self._frontPointer == self._rearPointer:
             self._frontPointer = self._rearPointer = -1
+        # Else, move front pointer along 1
+        else:
+            self._frontPointer = (self._frontPointer + 1) % 16
+
 
     """
     Removes all items from buffer

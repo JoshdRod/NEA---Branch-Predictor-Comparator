@@ -1,6 +1,5 @@
 """
 TODO:
-- Make processor halt at end of program (Fix bugs on NO-OPERATIONS)
 - Remove bugs
 - Change processor operating mode - currently, branch prediction doesn't improve anything, because there's no misfetch penalty
 - Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
@@ -24,7 +23,9 @@ class Processor:
         self.pipelineBuffer = PipelineBuffer(16)
         self.AGU = AGU(self.registers)
 
-    DEBUG = {"decoded-micro-ops": None,
+    DEBUG = {"decoded-micro-ops": {"opcode": None,
+                                   "operand": None,
+                                   "operandSize": None},
             "executed-micro-ops": {"opcode": None,
                                    "operand": None,
                                    "operandSize": None}}
@@ -44,13 +45,16 @@ class Processor:
         
         cycleNumber = 0
         filterOpcode = None
+        filterOperand = None
         # Stage 4 - Fetch, Decode, Execute, until exit syscall changes running flag
         while self.registers.Load("eflags")["Running"]:
             self.Fetch()
             self.Decode()
             self.Execute()
 
-            if self.DEBUG["executed-micro-ops"]["opcode"] == filterOpcode or filterOpcode == None:
+            if self.DEBUG["executed-micro-ops"]["opcode"] == filterOpcode\
+                or self.DEBUG["executed-micro-ops"]["operand"] == filterOperand\
+                or filterOpcode == None:
                 if filterOpcode is not None:
                     filterOpcode = None
 
@@ -71,10 +75,13 @@ class Processor:
 
                     Main Memory: {self.mainMemory.__data__}
 
-                    NEXT CYCLE? (S to set breakpoint on next opcode)
+                    NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand)
                     """)
-                if input() == 'S':
+                response = input()
+                if response == 'C':
                     filterOpcode = input("Enter opcode to set breakpoint on: ")
+                elif response == 'A':
+                    filterOperand = input("Enter operand to set breakpoint on: ")
 
             cycleNumber += 1
 
@@ -202,6 +209,7 @@ class Processor:
     def Execute(self):
         # Stage 1 : Get next mu-op in pipeline buffer
         mu_op = self.pipelineBuffer.Get()
+        self.DEBUG["executed-micro-ops"] = mu_op
 
         # Stage 2 : If operand is a memory address, run through AGU to calculate mem address to access
         if self.isMemoryAddress(mu_op["operand"]):
@@ -230,7 +238,6 @@ class Processor:
         self.pipelineBuffer.Remove()
         self.reorderBuffer.Remove()
 
-        self.DEBUG["executed-micro-ops"] = mu_op
 
     ##-------INSTRUCTION SET-------##
     #------DATA MANIPULATION------#
