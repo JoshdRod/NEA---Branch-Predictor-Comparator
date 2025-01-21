@@ -27,6 +27,7 @@ class Registers:
                            'PF': 0, # Parity Flag - Indicates result of previous operation was odd (0) or even (1)
                            'ZF': 0, # Zero Flag - Indicates result of previous operation was 0
                            'SF': 0, # Sign Flag - Indicates result of previous operation was negative
+                           "Running": 1 # TODO: CPUs handle wether to execute instructions or not inside of the control unit, but here the best approximation we have is to put it in eflags
                            #CF, OF, AF Only needed if compaisons are done between binary numbers 
                            }, 
 

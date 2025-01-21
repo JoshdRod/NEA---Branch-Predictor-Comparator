@@ -51,12 +51,12 @@ section .text
         jmp .mainLoop
 
     .end:
-        mov rax, 1 ; write
         mov rdi, 1 ; stdout
         mov rsi, array ; msg
         mov rdx, 6 ; size
+        mov rax, 1 ; write
         syscall
 
-        mov rax, 60 ; exit
         mov rdi, 0 ; status code (success!)
+        mov rax, 60 ; exit
         syscall

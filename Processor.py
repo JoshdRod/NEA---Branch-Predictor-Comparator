@@ -44,7 +44,8 @@ class Processor:
         
         cycleNumber = 0
         filterOpcode = None
-        while True:
+        # Stage 4 - Fetch, Decode, Execute, until exit syscall changes running flag
+        while self.registers.Load("eflags")["Running"]:
             self.Fetch()
             self.Decode()
             self.Execute()
@@ -76,6 +77,9 @@ class Processor:
                     filterOpcode = input("Enter opcode to set breakpoint on: ")
 
             cycleNumber += 1
+
+        # Stage 5 - Stop executing
+        print(f"DONE! In {cycleNumber} cycles\nHave a nice day :)")
             
 
 
@@ -431,8 +435,14 @@ class Processor:
                 return
             ## 60 - Exit
             case 60:
+                # Set running flag to 0 - stops FDE
+                eflags = self.registers.Load("eflags")
+                eflags["Running"] = 0
+                self.registers.Store("eflags", eflags)
+
+                # Flush pipeline
                 self.Flush()
-                return # TODO: Set this up to change a flag in the interrupts register, that then stops the CPU from running
+                return
     
     def Call():
         pass
