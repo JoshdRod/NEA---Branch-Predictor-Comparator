@@ -34,7 +34,12 @@ class Registers:
                 "rip": [0 for i in range(8)], # Instruction pointer (Program Counter)
                 "mbr": [0 for i in range(8)], # Memory Buffer Register
                 "mar": [0 for i in range(8)], # Memory Address Register
-                "cir": [0 for i in range(8)] # Current Instruction register (Can't find any documentation on this - might be bc you can't change its value programatically?)
+                "cir": [0 for i in range(8)], # Current Instruction register (Can't find any documentation on this - might be bc you can't change its value programatically?)
+                
+                #--SEGMENT REGISTERS--#
+                "cs": [0 for i in range(2)], # (start of) Code(text) segment pointer  
+                "ds": [0 for i in range(2)], # (start of) Data segment pointer
+                "ss": [0 for i in range(2)] # (start of) Stack segment pointer (not currently implemented)
                 }
     
     """
@@ -71,18 +76,24 @@ class Registers:
     INPUTS: str register to store in, list/int/str value to store 
     """
     def Store(self, register: str, value: list|int|str):
+        ## Non-general purpose registers
         # eflags stores dictionary of flags, so overwrite eflags with dictionary
         if register == "eflags":
             self.Registers["eflags"] = value
             return
 
+        if register == "cs" or register == "ds":
+            self.Registers[register] = [value, 0]
+            return 
+        
+        ## General-purpose registers
         # String instructions are 8 bytes, so overwrite whole register with string
         if type(value) == str:
             self.Registers[register] = value
             return
         
 
-        # As registers are 8 byte, convert single ints into 6 byte lists
+        # As registers are 8 byte, convert single ints into 8 byte lists
         if type(value) == int:
             value = [value] + [0 for i in range(7)]
         
