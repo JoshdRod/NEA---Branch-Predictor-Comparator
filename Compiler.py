@@ -71,7 +71,7 @@ class Compiler:
                      ]
             # Generate executable file
             self.Offsets = {"text": 2,
-                            "data": len(text)}
+                            "data": 2 + len(text)}
             executable = header + text + data # header, then text section, then data section
 
             # Final pass - remove symbols

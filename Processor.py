@@ -1,6 +1,6 @@
 """
 TODO:
-- Make processor halt at end of program
+- Make processor halt at end of program (Fix bugs on NO-OPERATIONS)
 - Remove bugs
 - Change processor operating mode - currently, branch prediction doesn't improve anything, because there's no misfetch penalty
 - Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
@@ -30,7 +30,7 @@ class Processor:
                                    "operandSize": None}}
     
     def Compute(self):
-        executable = [2, 31, 'mov rbx 29', 'mov rbp 34', 'mov rdi rbx', 'jmp 6', 'cmp rdi rbp', 'je 18', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 12', 'jmp 16', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 16', 'inc rdi', 'jmp 6', 'dec rbp', 'cmp rbx rbp', 'je 23', 'mov rdi rbx', 'jmp 6', 'mov rdi 1', 'mov rsi 29', 'mov rdx 6', 'mov rax 1', 'syscall', 'mov rdi 0', 'mov rax 60', 'syscall', 81, 77, 68, 69, 74, 65]
+        executable = [2, 31, 'mov rbx 31', 'mov rbp 36', 'mov rdi rbx', 'jmp 6', 'cmp rdi rbp', 'je 18', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 12', 'jmp 16', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 16', 'inc rdi', 'jmp 6', 'dec rbp', 'cmp rbx rbp', 'je 23', 'mov rdi rbx', 'jmp 6', 'mov rdi 1', 'mov rsi 31', 'mov rdx 6', 'mov rax 1', 'syscall', 'mov rdi 0', 'mov rax 60', 'syscall', 81, 77, 68, 69, 74, 65]
         # Stage 1 - Move executable into memory
         for index, line in enumerate(executable):
             self.mainMemory.Store(f"[{index}]", line)
