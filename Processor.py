@@ -62,44 +62,45 @@ class Processor:
             self.Decode()
             self.Execute()
 
-            if self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode\
-                or self.DEBUG["executedMicroOps"]["operand"] == filterOperand\
-                or cycleNumber == filterCycle\
-                or (filterOpcode == None\
-                and filterOperand == None\
-                and filterCycle == None):
+            # if self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode\
+            #     or self.DEBUG["executedMicroOps"]["operand"] == filterOperand\
+            #     or cycleNumber == filterCycle\
+            #     or (filterOpcode == None\
+            #     and filterOperand == None\
+            #     and filterCycle == None):
                 
-                # Reset filters
-                filterOpcode = None
-                filterOperand = None
-                filterCycle = None
-
-                print(f"""
-    -----------------------CYCLE {cycleNumber}-----------------------
-                    PROGRAM COUNTER: {self.registers.Load("rip")}
-                    {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
-                    Decoded: {self.registers.Load("cir")} into micro-ops: {self.DEBUG["decodedMicroOps"]}.
-                    Executed: {self.DEBUG["executedMicroOps"]}.
+            #     # Reset filters
+            #     filterOpcode = None 
+            #     filterOperand = None
+            #     filterCycle = None
+                
+    #             print(f"""
+    # -----------------------CYCLE {cycleNumber}-----------------------
+    #                 PROGRAM COUNTER: {self.registers.Load("rip")}
+    #                 {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
+    #                 Decoded: {self.registers.Load("cir")} into micro-ops: {self.DEBUG["decodedMicroOps"]}.
+    #                 Executed: {self.DEBUG["executedMicroOps"]}.
                     
-                    Pipeline: {self.pipelineBuffer._Buffer}
-                    (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
+    #                 Pipeline: {self.pipelineBuffer._Buffer}
+    #                 (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
 
-                    Re-Order Buffer: {self.reorderBuffer._Buffer}
-                    (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
+    #                 Re-Order Buffer: {self.reorderBuffer._Buffer}
+    #                 (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
 
-                    Registers: {self.registers.Registers.items()}
+    #                 Registers: {self.registers.Registers.items()}
 
-                    Main Memory: {self.mainMemory.__data__}
+    #                 Main Memory: {self.mainMemory.__data__}
 
-                    NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
-                    """)
-                response = input()
-                if response == 'C':
-                    filterOpcode = input("Enter opcode to set breakpoint on: ")
-                elif response == 'A':
-                    filterOperand = input("Enter operand to set breakpoint on: ")
-                elif response == 'N':
-                    filterCycle = int(input("Enter cycle number to set breakpoint on: "))
+    #                 NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
+    #                 """)
+
+            #     response = input()
+            #     if response == 'C':
+            #         filterOpcode = input("Enter opcode to set breakpoint on: ")
+            #     elif response == 'A':
+            #         filterOperand = input("Enter operand to set breakpoint on: ")
+            #     elif response == 'N':
+            #         filterCycle = int(input("Enter cycle number to set breakpoint on: "))
 
             cycleNumber += 1
 
@@ -458,7 +459,24 @@ class Processor:
         match callType:
             ## 1 - Write
             case 1:
-                print(self.registers.Load("rsi"))
+                ## Get all elements in memory that are in range
+                # Convert start address and size from list -> ints
+                rsi = self.registers.Load("rsi")
+                startAddress = 0
+                for index, byte in enumerate(rsi):
+                    startAddress += byte * 2**index
+
+                rdx = self.registers.Load("rdx")
+                size = 0
+                for index, byte in enumerate(rdx):
+                    size += byte * 2**index
+                # Put elements in write buffer
+                writeBuffer = []
+                for i in range(size):
+                    writeBuffer.append(self.mainMemory.Retrieve(f"[{startAddress + i}]"))
+
+                ## Output elements
+                print(writeBuffer)
                 return
             ## 60 - Exit
             case 60:
