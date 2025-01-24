@@ -1,6 +1,7 @@
 """
 TODO:
-- Remove bugs
+- Implement branch predictors!
+- Cycle number filter doesn't always seem to jump to the correct cycle number?
 - Change processor operating mode - currently, branch prediction doesn't improve anything, because there's no misfetch penalty
 - Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
 - Fix fact that all computed memory addresses can't contain spaces in the compiler (e.g: Won't accept "[rax + 5]" must be "[rax+5]")
