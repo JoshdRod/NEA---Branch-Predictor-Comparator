@@ -23,10 +23,16 @@ class Processor:
         self.pipelineBuffer = PipelineBuffer(16)
         self.AGU = AGU(self.registers)
 
-    DEBUG = {"decoded-micro-ops": {"opcode": None,
+        ## Control signals
+        self.running = True # TODO: REPLACE FLAG IN EFLAGS W/ THIS
+        self.stallFetch = False # TODO: IMPLEMENT THIS SO IT STALLS FETCH WHEN PIPELINE/RO BUFFER FULL
+
+    DEBUG = {
+            "fetchedInstruction": None,
+            "decodedMicroOps": {"opcode": None,
                                    "operand": None,
                                    "operandSize": None},
-            "executed-micro-ops": {"opcode": None,
+            "executedMicroOps": {"opcode": None,
                                    "operand": None,
                                    "operandSize": None}}
     
@@ -46,24 +52,33 @@ class Processor:
         cycleNumber = 0
         filterOpcode = None
         filterOperand = None
+        filterCycle = None
         # Stage 4 - Fetch, Decode, Execute, until exit syscall changes running flag
-        while self.registers.Load("eflags")["Running"]:
-            self.Fetch()
+        while self.running:
+            # Ignore stalled parts of pipeline
+            if not self.stallFetch:
+                self.Fetch()
             self.Decode()
             self.Execute()
 
-            if self.DEBUG["executed-micro-ops"]["opcode"] == filterOpcode\
-                or self.DEBUG["executed-micro-ops"]["operand"] == filterOperand\
-                or filterOpcode == None:
-                if filterOpcode is not None:
-                    filterOpcode = None
+            if self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode\
+                or self.DEBUG["executedMicroOps"]["operand"] == filterOperand\
+                or cycleNumber == filterCycle\
+                or (filterOpcode == None\
+                and filterOperand == None\
+                and filterCycle == None):
+                
+                # Reset filters
+                filterOpcode = None
+                filterOperand = None
+                filterCycle = None
 
                 print(f"""
     -----------------------CYCLE {cycleNumber}-----------------------
                     PROGRAM COUNTER: {self.registers.Load("rip")}
-                    Fetched: {self.registers.Load("cir")} from location: {self.registers.Load("mar")}.
-                    Decoded: {self.registers.Load("cir")} into micro-ops: {self.DEBUG["decoded-micro-ops"]}.
-                    Executed: {self.DEBUG["executed-micro-ops"]}.
+                    {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
+                    Decoded: {self.registers.Load("cir")} into micro-ops: {self.DEBUG["decodedMicroOps"]}.
+                    Executed: {self.DEBUG["executedMicroOps"]}.
                     
                     Pipeline: {self.pipelineBuffer._Buffer}
                     (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
@@ -75,13 +90,15 @@ class Processor:
 
                     Main Memory: {self.mainMemory.__data__}
 
-                    NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand)
+                    NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
                     """)
                 response = input()
                 if response == 'C':
                     filterOpcode = input("Enter opcode to set breakpoint on: ")
                 elif response == 'A':
                     filterOperand = input("Enter operand to set breakpoint on: ")
+                elif response == 'N':
+                    filterCycle = int(input("Enter cycle number to set breakpoint on: "))
 
             cycleNumber += 1
 
@@ -116,6 +133,9 @@ class Processor:
             self.registers.Store("cir", f"{self.registers.Load("mbr")}*")
         else:
             self.registers.Store("cir", self.registers.Load("mbr"))
+
+        ## Return fetched instruction for output console
+        self.DEBUG["fetchedInstruction"] = self.registers.Load("cir")
 
     def Decode(self):
         # TODO: Return if nothing in cir
@@ -189,27 +209,26 @@ class Processor:
             mu_opBuffer = list(map(lambda x: x+'*' , mu_opBuffer))
 
         ## Stage 2 - 3 : Insert mu-ops into ROB and Pipeline Buffer (Not using reservation stations, as no tommasulo)
-        # Check if there's enough space in ROB for mu-ops (if not, pipeline stalls) (TODO: If pipeline stalls, we'll have to decode the instruction all over again, surely that doesn't happen irl?)
-        if self.reorderBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer):
-            raise Exception(f"Not enough space in ROB to insert mu-ops:\
-                             needed {len(mu_opBuffer)}, available {self.reorderBuffer.GetNumberOfFreeSpaces()} - pipeline stall needed")
-        
-        # Check if there's enough space in Pipeline Buffer for mu-ops (if not, pipeline stalls) (TODO: If pipeline stalls, we'll have to decode the instruction all over again, surely that doesn't happen irl?)
-        if self.pipelineBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer):
-            raise Exception(f"Not enough space in Pipeline Buffer to insert mu-ops:\
-                             needed {len(mu_opBuffer)}, available {self.pipelineBuffer.GetNumberOfFreeSpaces()} - pipeline stall needed")
-        # TODO: This really does NOT seem very DRY
+
+        # Check if there's enough space in ROB and Pipeline Buffer for mu-ops (if not, fetch stalls) 
+        robOutOfSpace = self.reorderBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer)
+        pipelineOutOfSpace = self.pipelineBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer)
+
+        if robOutOfSpace or pipelineOutOfSpace:
+            self.stallFetch = True
+            return
 
         # Insert mu-ops into ROB and pipeline buffer
         self.reorderBuffer.Add(mu_opBuffer, size)
         self.pipelineBuffer.Add(mu_opBuffer, size)
+        stallFetch = False
 
-        self.DEBUG["decoded-micro-ops"] = mu_opBuffer
+        self.DEBUG["decodedMicroOps"] = mu_opBuffer
 
     def Execute(self):
         # Stage 1 : Get next mu-op in pipeline buffer
         mu_op = self.pipelineBuffer.Get()
-        self.DEBUG["executed-micro-ops"] = mu_op
+        self.DEBUG["executedMicroOps"] = mu_op
 
         # Stage 2 : If operand is a memory address, run through AGU to calculate mem address to access
         if self.isMemoryAddress(mu_op["operand"]):
@@ -442,11 +461,8 @@ class Processor:
                 return
             ## 60 - Exit
             case 60:
-                # Set running flag to 0 - stops FDE
-                eflags = self.registers.Load("eflags")
-                eflags["Running"] = 0
-                self.registers.Store("eflags", eflags)
-
+                # Set running signal to 0 - stops FDE
+                self.running = False
                 # Flush pipeline
                 self.Flush()
                 return
@@ -474,6 +490,8 @@ class Processor:
         self.registers.Store("mar", 0)
         self.registers.Store("mbr", '')
         self.registers.Store("cir", '')
+        # Set control signals to default
+        self.stallFetch = False
 
     def isMemoryAddress(self, src: str) -> bool:
         if type(src) is not str:
