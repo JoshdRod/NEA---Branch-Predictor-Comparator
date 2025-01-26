@@ -26,13 +26,13 @@ class Processor:
 
         ## Control signals
         self.running = True # TODO: REPLACE FLAG IN EFLAGS W/ THIS
-        self.stallFetch = False # TODO: IMPLEMENT THIS SO IT STALLS FETCH WHEN PIPELINE/RO BUFFER FULL
+        self.stalledStages = {"Fetch" : False,
+                      "Decode" : True,
+                      "Execute" : True}
 
     DEBUG = {
             "fetchedInstruction": None,
-            "decodedMicroOps": {"opcode": None,
-                                   "operand": None,
-                                   "operandSize": None},
+            "decodedMicroOps": [],
             "executedMicroOps": {"opcode": None,
                                    "operand": None,
                                    "operandSize": None}}
@@ -57,51 +57,63 @@ class Processor:
         # Stage 4 - Fetch, Decode, Execute, until exit syscall changes running flag
         while self.running:
             # Ignore stalled parts of pipeline
-            if not self.stallFetch:
+            if not self.stalledStages["Execute"]:
+                self.Execute()
+            if not self.stalledStages["Decode"]:
+                self.Decode()
+            if not self.stalledStages["Fetch"]:
                 self.Fetch()
-            self.Decode()
-            self.Execute()
 
-            # if self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode\
-            #     or self.DEBUG["executedMicroOps"]["operand"] == filterOperand\
-            #     or cycleNumber == filterCycle\
-            #     or (filterOpcode == None\
-            #     and filterOperand == None\
-            #     and filterCycle == None):
+            if (self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode\
+                or self.DEBUG["executedMicroOps"]["operand"] == filterOperand\
+                or cycleNumber == filterCycle)\
+                and self.DEBUG["executedMicroOps"] != {"opcode": None, "operand": None, "operandSize": None}\
+                or (filterOpcode == None\
+                and filterOperand == None\
+                and filterCycle == None):
                 
-            #     # Reset filters
-            #     filterOpcode = None 
-            #     filterOperand = None
-            #     filterCycle = None
+                # Reset filters
+                filterOpcode = None 
+                filterOperand = None
+                filterCycle = None
                 
-    #             print(f"""
-    # -----------------------CYCLE {cycleNumber}-----------------------
-    #                 PROGRAM COUNTER: {self.registers.Load("rip")}
-    #                 {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
-    #                 Decoded: {self.registers.Load("cir")} into micro-ops: {self.DEBUG["decodedMicroOps"]}.
-    #                 Executed: {self.DEBUG["executedMicroOps"]}.
+                print(f"""
+    -----------------------CYCLE {cycleNumber}-----------------------
+                    PROGRAM COUNTER: {self.registers.Load("rip")}
+                    {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
+                    Decoded: 
+                    {f"{self.registers.Load("cir")} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
+                    Executed: 
+                    {f"{self.DEBUG["executedMicroOps"]}." if self.DEBUG["executedMicroOps"]["opcode"] is not None else "Execute Stalled!"}
                     
-    #                 Pipeline: {self.pipelineBuffer._Buffer}
-    #                 (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
+                    Pipeline: {self.pipelineBuffer._Buffer}
+                    (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
 
-    #                 Re-Order Buffer: {self.reorderBuffer._Buffer}
-    #                 (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
+                    Re-Order Buffer: {self.reorderBuffer._Buffer}
+                    (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
 
-    #                 Registers: {self.registers.Registers.items()}
+                    Registers: {self.registers.Registers.items()}
 
-    #                 Main Memory: {self.mainMemory.__data__}
+                    Main Memory: {self.mainMemory.__data__}
 
-    #                 NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
-    #                 """)
+                    NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
+                    """)
 
-            #     response = input()
-            #     if response == 'C':
-            #         filterOpcode = input("Enter opcode to set breakpoint on: ")
-            #     elif response == 'A':
-            #         filterOperand = input("Enter operand to set breakpoint on: ")
-            #     elif response == 'N':
-            #         filterCycle = int(input("Enter cycle number to set breakpoint on: "))
+                response = input()
+                if response == 'C':
+                    filterOpcode = input("Enter opcode to set breakpoint on: ")
+                elif response == 'A':
+                    filterOperand = input("Enter operand to set breakpoint on: ")
+                elif response == 'N':
+                    filterCycle = int(input("Enter cycle number to set breakpoint on: "))
 
+            # Reset cycle data, increment cycle no
+            self.DEBUG = {
+            "fetchedInstruction": None,
+            "decodedMicroOps": [],
+            "executedMicroOps": {"opcode": None,
+                                   "operand": None,
+                                   "operandSize": None}}
             cycleNumber += 1
 
         # Stage 5 - Stop executing
@@ -135,6 +147,9 @@ class Processor:
             self.registers.Store("cir", f"{self.registers.Load("mbr")}*")
         else:
             self.registers.Store("cir", self.registers.Load("mbr"))
+        
+        # Unstall Decode for next cycle
+        self.stalledStages["Decode"] = False
 
         ## Return fetched instruction for output console
         self.DEBUG["fetchedInstruction"] = self.registers.Load("cir")
@@ -175,8 +190,6 @@ class Processor:
                     continue
                 case _:
                     continue
-
-        ##TODO: FINISH APPENDING OPERAND SIZES TO END OF MU_OPS (so that processor knows how many mem. addresses to change in a STO)
 
         mu_opBuffer = []
         match opcode:
@@ -223,6 +236,11 @@ class Processor:
         # Insert mu-ops into ROB and pipeline buffer
         self.reorderBuffer.Add(mu_opBuffer, size)
         self.pipelineBuffer.Add(mu_opBuffer, size)
+
+        # Unstall fetch and execute for next cycle
+        self.stalledStages["Fetch"] = False
+        self.stalledStages["Execute"] = False
+        
         stallFetch = False
 
         self.DEBUG["decodedMicroOps"] = mu_opBuffer
@@ -510,7 +528,9 @@ class Processor:
         self.registers.Store("mbr", '')
         self.registers.Store("cir", '')
         # Set control signals to default
-        self.stallFetch = False
+        self.stalledStages = {"Fetch": False,
+                      "Decode": True,
+                      "Execute": True}
 
     def isMemoryAddress(self, src: str) -> bool:
         if type(src) is not str:
