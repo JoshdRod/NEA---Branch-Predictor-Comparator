@@ -8,16 +8,16 @@ TODO:
 - A direct CPU interface would be nice (like the IDLE interpreter)
 """
 
-from MainMemory import MainMemory
-import DirectionPredictors
-from Buffers import ReorderBuffer, PipelineBuffer
-from AddressGenerationUnit import AGU
-from Registers import Registers
+from CPU.MainMemory import MainMemory
+import CPU.DirectionPredictors
+from CPU.Buffers import ReorderBuffer, PipelineBuffer
+from CPU.AddressGenerationUnit import AGU
+from CPU.Registers import Registers
 
 class Processor:
 
     def __init__(self):
-        self.predictor = DirectionPredictors.BasePredictor() # TODO
+        self.predictor = CPU.DirectionPredictors.BasePredictor() # TODO
         self.registers = Registers()
         self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
@@ -544,5 +544,6 @@ class Processor:
         
     def isImmediateValue(self, src: int) -> bool:
         return True if type(src) is int else False
-P = Processor()
-P.Compute()
+
+# P = Processor()
+# P.Compute()

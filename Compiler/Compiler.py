@@ -1,3 +1,4 @@
+import typing
 class Compiler:
     SymbolTable = [None for i in range(100)]
     Offsets = {}
@@ -7,75 +8,74 @@ class Compiler:
     # instead of: ["mov", "rbp,", "array", "+", "5"])
 
     # Deal w/ data values in the _data section (assign them locations in memory + replace pointers w/ their locations)
-    def Compile(self, fileName):
+    def Compile(self, f: typing.TextIO):
         # Read in file
-        with open(fileName, 'r') as f:
-            asm = f.readlines()
+        asm = f.readlines()
 
-            ## GENERIC
-            # Remove Empty lines/indentation
-            asm = list(filter(lambda x: not x.isspace(), asm)) # isspace returns true of whole string only consists of spaces
-            asm = list(map(lambda x: x.strip(), asm))
-            # Remove Whole line Comments
-            asm = list(filter(lambda x: not x.startswith(';'), asm)) # Filter only returns elements that return true out of the function
-            # Remove inline Comments
-            asm = list(map(lambda x: x[:x.find(';') - 1] if x.find(';') != -1 else x, asm)) # Find returns 1st instance of substring in string (or -1 if not found)
-            # Remove all commas from entries
-            asm = list(map(lambda x: x.replace(',', ''), asm))
+        ## GENERIC
+        # Remove Empty lines/indentation
+        asm = list(filter(lambda x: not x.isspace(), asm)) # isspace returns true of whole string only consists of spaces
+        asm = list(map(lambda x: x.strip(), asm))
+        # Remove Whole line Comments
+        asm = list(filter(lambda x: not x.startswith(';'), asm)) # Filter only returns elements that return true out of the function
+        # Remove inline Comments
+        asm = list(map(lambda x: x[:x.find(';') - 1] if x.find(';') != -1 else x, asm)) # Find returns 1st instance of substring in string (or -1 if not found)
+        # Remove all commas from entries
+        asm = list(map(lambda x: x.replace(',', ''), asm))
 
-            ##DATA SECTION
-            # Find the start and end of data section
-            data = self.FindSection(asm, "data")
+        ##DATA SECTION
+        # Find the start and end of data section
+        data = self.FindSection(asm, "data")
 
-            # Convert data to 1d array of tokens (a token is separated by whitespace) 
-            data = " ".join(data) 
-            data = data.split(' ')
+        # Convert data to 1d array of tokens (a token is separated by whitespace) 
+        data = " ".join(data) 
+        data = data.split(' ')
 
-            # Remove all db/dw/dq, for now
-            data = list(filter(lambda x: not x in ["db", "dw", "dd", "dq", "dt"], data))
+        # Remove all db/dw/dq, for now
+        data = list(filter(lambda x: not x in ["db", "dw", "dd", "dq", "dt"], data))
 
 
-            # Generate a list of pointers in data section, and their locations
-            dataPointers = []
-            for index, token in enumerate(data):
-                # If token is non-numeric, it's a pointer, so add it and location to list of pointers, then remove it
-                if not token.isnumeric():
-                    dataPointers.append({"name": token,
-                                         "location": index,
-                                         "section": "data"})
-                    data.pop(index)
-            
-            # Convert all data values to ints
-            data = list(map(int, data))
+        # Generate a list of pointers in data section, and their locations
+        dataPointers = []
+        for index, token in enumerate(data):
+            # If token is non-numeric, it's a pointer, so add it and location to list of pointers, then remove it
+            if not token.isnumeric():
+                dataPointers.append({"name": token,
+                                        "location": index,
+                                        "section": "data"})
+                data.pop(index)
+        
+        # Convert all data values to ints
+        data = list(map(int, data))
 
-            ##TEXT SECTION
-            # Find the start and end of the text section
-            text = self.FindSection(asm, "text")
+        ##TEXT SECTION
+        # Find the start and end of the text section
+        text = self.FindSection(asm, "text")
 
-            # Generate a list of labels in text section, and their location
-            labels = []
-            for index, token in enumerate(text):
-                if token.startswith('.') and token.endswith(':'):
-                    labels.append({"name": token[:-1], # Remove the last (:) part of token
-                                   "location": index,
-                                   "section": "text"})
-                    text.pop(index)
+        # Generate a list of labels in text section, and their location
+        labels = []
+        for index, token in enumerate(text):
+            if token.startswith('.') and token.endswith(':'):
+                labels.append({"name": token[:-1], # Remove the last (:) part of token
+                                "location": index,
+                                "section": "text"})
+                text.pop(index)
 
-            # Create Symbol Table
-            self.GenerateSymbolTable(dataPointers + labels) # Generate symbol table
+        # Create Symbol Table
+        self.GenerateSymbolTable(dataPointers + labels) # Generate symbol table
 
-            ## HEADER SECTION
-            # Used for ensuring rip doesn't go into data section
-            header = [2, # Start of text section
-                      2 + len(text) # Start of data section
-                     ]
-            # Generate executable file
-            self.Offsets = {"text": 2,
-                            "data": 2 + len(text)}
-            executable = header + text + data # header, then text section, then data section
+        ## HEADER SECTION
+        # Used for ensuring rip doesn't go into data section
+        header = [2, # Start of text section
+                    2 + len(text) # Start of data section
+                    ]
+        # Generate executable file
+        self.Offsets = {"text": 2,
+                        "data": 2 + len(text)}
+        executable = header + text + data # header, then text section, then data section
 
-            # Final pass - remove symbols
-            executable = list(map(self.ReplaceSymbols, executable))
+        # Final pass - remove symbols
+        executable = list(map(self.ReplaceSymbols, executable))
         return
 
     # Should get an error, because as when the label is eventually removed from the source code, its pointer,
@@ -182,8 +182,8 @@ class Compiler:
         return asm[startPointer : endPointer]
         
 
-C = Compiler()
-C.Compile("test2.txt")
+# C = Compiler()
+# C.Compile("test2.txt")
 
 
 

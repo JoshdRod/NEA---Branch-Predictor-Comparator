@@ -134,74 +134,74 @@ class CircularBuffer(Buffer):
     def CreateBufferItem(item):
         raise NotImplementedError()
     
-"""
-Hash Table Buffer - Storing data as a hash table
-EXTRA DATA:
+# """
+# Hash Table Buffer - Storing data as a hash table
+# EXTRA DATA:
 
-EXTRA FUNCTIONALITY:
-    Hash 
+# EXTRA FUNCTIONALITY:
+#     Hash 
 
-REQUIRED FUNCTIONALITY ON SUBCLASSES:
-    GetIndexFromBufferItem (Takes in a value of a bin, and returns the unique index identifier from it)
-    CreateBufferItem (formats the item fed into Add, so that it can be added to the table with the correct information)
-"""
-class HashTableBuffer(Buffer):
-    def __init__(self, size, name):
-        super.__init__(size, name)
+# REQUIRED FUNCTIONALITY ON SUBCLASSES:
+#     GetIndexFromBufferItem (Takes in a value of a bin, and returns the unique index identifier from it)
+#     CreateBufferItem (formats the item fed into Add, so that it can be added to the table with the correct information)
+# """
+# class HashTableBuffer(Buffer):
+#     def __init__(self, size, name):
+#         super.__init__(size, name)
 
-    # Finds number of free spaces in hash table
-    def GetNumberOfFreeSpaces(self) -> int:
-        return len(filter(lambda x: x is None, self._Buffer))
+#     # Finds number of free spaces in hash table
+#     def GetNumberOfFreeSpaces(self) -> int:
+#         return len(filter(lambda x: x is None, self._Buffer))
 
-    # Hashes index, then uses hash to find value in hash table 
-    def Get(self, index: int = 0) -> dict:
-        # Hash
-        key = self.Hash(index)
-        # Search from key, until we hit an empty bin - in which case, value is not in table
-        for i in range(self._SIZE):
-            binPointer = (key + i) % self._SIZE
-            if self._Buffer[binPointer] is not None:
-                if self.GetIndexFromBufferItem(self._Buffer[binPointer]) == index:
-                    return binPointer
+#     # Hashes index, then uses hash to find value in hash table 
+#     def Get(self, index: int = 0) -> dict:
+#         # Hash
+#         key = self.Hash(index)
+#         # Search from key, until we hit an empty bin - in which case, value is not in table
+#         for i in range(self._SIZE):
+#             binPointer = (key + i) % self._SIZE
+#             if self._Buffer[binPointer] is not None:
+#                 if self.GetIndexFromBufferItem(self._Buffer[binPointer]) == index:
+#                     return binPointer
 
-            # -1 = Not in hash table
-            return -1
-        else:
-            raise Exception("Symbol Table is full!")
+#             # -1 = Not in hash table
+#             return -1
+#         else:
+#             raise Exception("Symbol Table is full!")
         
-    # Hashes index of item, then uses that as key to insert into hash table
-    def Add(self, item: dict|list, size: int =1):
-        if item == []:
-            return
-        elif type(item) == list:
-            self.Add(item.pop())
-            return self.Add(item)    
-        # TODO: FINISH IMPLEMENTATION HERE
-        for symbol in symbols:
-            #location = "0x" + str(symbol["location"])
-            # Hash
-            key = self.hash(symbol["name"])
-            # Insert dict {name: memory location} into index of hash in symbol table
-            for i in range(100):
-                if self.SymbolTable[(key + i) % 100] is not None: continue
+#     # Hashes index of item, then uses that as key to insert into hash table
+#     def Add(self, item: dict|list, size: int =1):
+#         if item == []:
+#             return
+#         elif type(item) == list:
+#             self.Add(item.pop())
+#             return self.Add(item)    
+#         # TODO: FINISH IMPLEMENTATION HERE
+#         for symbol in symbols:
+#             #location = "0x" + str(symbol["location"])
+#             # Hash
+#             key = self.hash(symbol["name"])
+#             # Insert dict {name: memory location} into index of hash in symbol table
+#             for i in range(100):
+#                 if self.SymbolTable[(key + i) % 100] is not None: continue
 
-                self.SymbolTable[(key + i) % 100] = symbol
-                break
-            else:
-                raise Exception("Symbol Table is full!")
-        return
+#                 self.SymbolTable[(key + i) % 100] = symbol
+#                 break
+#             else:
+#                 raise Exception("Symbol Table is full!")
+#         return
     
-    """
-    Remove item at front of buffer
-    """
-    def Remove(self):
-        raise NotImplementedError()
+#     """
+#     Remove item at front of buffer
+#     """
+#     def Remove(self):
+#         raise NotImplementedError()
 
-    """
-    Removes all items from buffer
-    """
-    def Flush(self):
-        raise NotImplementedError()
+#     """
+#     Removes all items from buffer
+#     """
+#     def Flush(self):
+#         raise NotImplementedError()
 
 
 # ----------------------------------------------------------------------------------------
