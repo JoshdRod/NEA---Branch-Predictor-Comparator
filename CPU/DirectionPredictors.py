@@ -1,4 +1,7 @@
 class BasePredictor:
+    
+    def __init__(self):
+        self.name = "Always Not Taken"
 
     stalled = True # Predictor stalls after an unsuccessful branch (e.g: branch to 10, fetch 10, then predict 11..)
     def Predict(self, programCounter: int):

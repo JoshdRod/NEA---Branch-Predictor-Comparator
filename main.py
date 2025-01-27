@@ -5,21 +5,33 @@ from CPU.Processor import Processor
 C = Compiler()
 P = Processor()
 
+CURRENT_PATH = os.curdir
+ALGORITHMS_PATH = os.path.join(CURRENT_PATH, "Algorithms")
+
+
 ## Allow user to select algorithm
 # Display files in algorithms folder
-AvailableAlgorithms = os.listdir("../Algorithms")
+AvailableAlgorithms = os.listdir(ALGORITHMS_PATH)
 print("Select which algorithm you would like to run: ")
 for index, alg in enumerate(AvailableAlgorithms):
-    print(f"{index}. {alg}")
-selectedAlgorithm = AvailableAlgorithms[int(input())]
+    print(f"{index}. {alg.removesuffix(".txt")}")
 
-with open(f"../Algorithms/{selectedAlgorithm}.txt", 'r') as f:
-    Compiler.Compile(f)
+SelectedAlgorithm = AvailableAlgorithms[int(input())]
+
+# Open correct file and compile it
+with open(os.path.join(ALGORITHMS_PATH, f"{SelectedAlgorithm}"), 'r') as f:
+    print("Compiling...")
+    executable = C.Compile(f)
+    print("Compiled to executable!")
+
+## TODO: Allow user to select branch predictors to run
+#print("Select Branch Predictor to run: ")
+
+## Run on processor
+P.Compute(executable)
+
+## Display graph of mispredictions/cycles
 
 print("Yippee")
     
-# Open correct file and compile it
 
-## Allow user to select branch predictors to run
-
-## Display graph of mispredictions/cycles

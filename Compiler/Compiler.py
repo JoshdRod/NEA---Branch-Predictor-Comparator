@@ -8,7 +8,7 @@ class Compiler:
     # instead of: ["mov", "rbp,", "array", "+", "5"])
 
     # Deal w/ data values in the _data section (assign them locations in memory + replace pointers w/ their locations)
-    def Compile(self, f: typing.TextIO):
+    def Compile(self, f: typing.TextIO) -> list:
         # Read in file
         asm = f.readlines()
 
@@ -76,7 +76,7 @@ class Compiler:
 
         # Final pass - remove symbols
         executable = list(map(self.ReplaceSymbols, executable))
-        return
+        return executable
 
     # Should get an error, because as when the label is eventually removed from the source code, its pointer,
     # and all subsequent, are going to be off by an offset of 1. This offset increases for every new label defined

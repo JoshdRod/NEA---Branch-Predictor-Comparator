@@ -37,7 +37,12 @@ class Processor:
                                    "operand": None,
                                    "operandSize": None}}
     
-    def Compute(self):
+    """
+    Computes an executable algorithm inoput to it
+    INPUTS: list executable file to run
+    RETURNS: dict {no correctly predicted branches, no mispredicted branches}
+    """
+    def Compute(self, executable: list) -> dict:
         executable = [2, 31, 'mov rbx 31', 'mov rbp 36', 'mov rdi rbx', 'jmp 6', 'cmp rdi rbp', 'je 18', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 12', 'jmp 16', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 16', 'inc rdi', 'jmp 6', 'dec rbp', 'cmp rbx rbp', 'je 23', 'mov rdi rbx', 'jmp 6', 'mov rdi 1', 'mov rsi 31', 'mov rdx 6', 'mov rax 1', 'syscall', 'mov rdi 0', 'mov rax 60', 'syscall', 81, 77, 68, 69, 74, 65]
         # Stage 1 - Move executable into memory
         for index, line in enumerate(executable):
@@ -107,17 +112,19 @@ class Processor:
                 elif response == 'N':
                     filterCycle = int(input("Enter cycle number to set breakpoint on: "))
 
-            # Reset cycle data, increment cycle no
+            # Reset cycle data, increment cycle no, unstall fetch if stalled
             self.DEBUG = {
             "fetchedInstruction": None,
             "decodedMicroOps": [],
             "executedMicroOps": {"opcode": None,
                                    "operand": None,
                                    "operandSize": None}}
+            self.stalledStages["Fetch"] = False
             cycleNumber += 1
 
         # Stage 5 - Stop executing
         print(f"DONE! In {cycleNumber} cycles\nHave a nice day :)")
+        return {0} # TODO: IMPLEMENT RETURNING CORRECT DICT (In fun definition)
             
 
 
@@ -230,7 +237,7 @@ class Processor:
         pipelineOutOfSpace = self.pipelineBuffer.GetNumberOfFreeSpaces() < len(mu_opBuffer)
 
         if robOutOfSpace or pipelineOutOfSpace:
-            self.stallFetch = True
+            self.stalledStages["Fetch"] = True
             return
 
         # Insert mu-ops into ROB and pipeline buffer
@@ -241,8 +248,6 @@ class Processor:
         self.stalledStages["Fetch"] = False
         self.stalledStages["Execute"] = False
         
-        stallFetch = False
-
         self.DEBUG["decodedMicroOps"] = mu_opBuffer
 
     def Execute(self):
@@ -527,8 +532,8 @@ class Processor:
         self.registers.Store("mar", 0)
         self.registers.Store("mbr", '')
         self.registers.Store("cir", '')
-        # Set control signals to default
-        self.stalledStages = {"Fetch": False,
+        # Stall all pipeline stages
+        self.stalledStages = {"Fetch": True,
                       "Decode": True,
                       "Execute": True}
 
