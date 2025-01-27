@@ -32,6 +32,7 @@ class Processor:
 
     DEBUG = {
             "fetchedInstruction": None,
+            "decodedInstruction": None,
             "decodedMicroOps": [],
             "executedMicroOps": {"opcode": None,
                                    "operand": None,
@@ -87,7 +88,7 @@ class Processor:
                     PROGRAM COUNTER: {self.registers.Load("rip")}
                     {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
                     Decoded: 
-                    {f"{self.registers.Load("cir")} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
+                    {f"{self.DEBUG["decodedInstruction"]} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
                     Executed: 
                     {f"{self.DEBUG["executedMicroOps"]}." if self.DEBUG["executedMicroOps"]["opcode"] is not None else "Execute Stalled!"}
                     
@@ -115,6 +116,7 @@ class Processor:
             # Reset cycle data, increment cycle no, unstall fetch if stalled
             self.DEBUG = {
             "fetchedInstruction": None,
+            "decodedInstruction": None,
             "decodedMicroOps": [],
             "executedMicroOps": {"opcode": None,
                                    "operand": None,
@@ -241,13 +243,14 @@ class Processor:
             return
 
         # Insert mu-ops into ROB and pipeline buffer
-        self.reorderBuffer.Add(mu_opBuffer, size)
+        self.reorderBuffer.Add(mu_opBuffer, size, {"location" :self.registers.Load("ripb")})
         self.pipelineBuffer.Add(mu_opBuffer, size)
 
         # Unstall fetch and execute for next cycle
         self.stalledStages["Fetch"] = False
         self.stalledStages["Execute"] = False
         
+        self.DEBUG["decodedInstruction"] = currentInstruction
         self.DEBUG["decodedMicroOps"] = mu_opBuffer
 
     def Execute(self):
@@ -459,18 +462,18 @@ class Processor:
         # If met, next fetch location = rax
         if comparisonMet:
             nextFetchLocation = self.registers.Load("rax")
+        else:
+            nextFetchLocation = self.reorderBuffer.Get()["location"]
 
-        # Take next mu-op
+        # Check if direction of branch correctly predicted - if not, flush pipeline, stall predictor, and point rip to correct address
         nextMu_op = self.reorderBuffer.Get(1)
-
-        # If mu-op prediction and actual result don't match up, flush pipline and reset rip
         if comparisonMet != nextMu_op["speculative"]:
             self.Flush()
-            self.registers.Store("rip", self.registers.Load("rax"))
+            self.predictor.Stall()
+            self.registers.Store("rip", nextFetchLocation)
 
-        # Update (and stall for 1 cycle) branch predictor with result
+        # Update branch predictor with result
         self.predictor.Update()
-        self.predictor.Stall()
         return
 
     # TODO: Make actually work

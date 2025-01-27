@@ -83,11 +83,11 @@ class CircularBuffer(Buffer):
         return self._Buffer[(self._frontPointer + index) % 16]
     
     # Uses pointers to add item/lists of items at end of buffer
-    def Add(self, item: str|list, size: int):
+    def Add(self, item: str|list, size: int, data: dict = None):
         # If given list of items, add them all iteratively
         if type(item) == list:
             for i in item:
-                self.Add(i, size)
+                self.Add(i, size, data)
             return # Recursion isn't very KISS here, use iteration
         
         # If a single item, add to buffer
@@ -100,7 +100,7 @@ class CircularBuffer(Buffer):
             self._frontPointer = 0
         
         # Create item to add to buffer
-        bufferItem = self.CreateBufferItem(item, size)
+        bufferItem = self.CreateBufferItem(item, size, data)
 
         # Add buffer item to end of buffer
         self._rearPointer = (self._rearPointer + 1) % 16
@@ -216,8 +216,9 @@ class ReorderBuffer(CircularBuffer):
     def __init__(self, size: int = 16, name: str = "ROB"):
         super().__init__(size, name) # super() calls the method on the superclass
         
-    def CreateBufferItem(self, item: str, size: int) -> dict:
+    def CreateBufferItem(self, item: str, size: int, data: dict) -> dict:
         bufferItem = {"opcode": item.split()[0].rstrip('*'),
+                      "location": data["location"],
                       "speculative": item.endswith('*')} # * at end indicates BP predicted branch taken 
         return bufferItem
 
@@ -226,8 +227,8 @@ class PipelineBuffer(CircularBuffer):
     def __init__(self, size: int = 16, name: str = "Pipeline Buffer"):
         super().__init__(size, name)
 
-    # Expected input: mu-op, w/ a * at end if it's speculative
-    def CreateBufferItem(self, item: str, operandSize: int) -> dict:
+    # Expected input: mu-op, w/ a * at end if it's speculative (Not expecting any extra data)
+    def CreateBufferItem(self, item: str, operandSize: int, data: dict) -> dict:
         bufferItem = {"opcode": None, "operand": None, "operandSize": operandSize} # operandSize is the no. bytes the operation involves (e.g: In MOV [10] r10b, the mu_op STO [10] has an operand size of 1 byte)
 
         decomposedMu_op = item.split()
