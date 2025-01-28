@@ -1,6 +1,17 @@
+"""
+Branch Predictor Interface
+DATA:
+    str name
+    bool stalled
+FUNCTIONALITY:
+    Predict
+    Update
+    Stall
+"""
 class BasePredictor:
     def __init__(self, name):
         self.name = name
+        self._stalled = True
 
     """
     Predicts the next instruction to fetch based on the program counter
@@ -12,11 +23,14 @@ class BasePredictor:
 
     """
     Updates branch target buffer with the given branch instruction
-    INPUT:
+    INPUT int address of branch location
     """
     def Update(self):
         pass
 
+    """
+    Sets predictor to stalled state (e.g: On mispredict, to ensure first instruction isn't skipped due to predicting rip + 1)
+    """
     def Stall(self):
         pass
 
