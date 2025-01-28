@@ -29,6 +29,11 @@ class Processor:
         self.stalledStages = {"Fetch" : False,
                       "Decode" : True,
                       "Execute" : True}
+        
+        ## Misprediction Counting
+        self.predictionTracker = {"Predicted": [], # List contains cycle no.s where mis/prediction occurs
+                                  "Mispredicted": []}
+        self.cycleCount = 0
 
     DEBUG = {
             "fetchedInstruction": None,
@@ -41,10 +46,9 @@ class Processor:
     """
     Computes an executable algorithm inoput to it
     INPUTS: list executable file to run
-    RETURNS: dict {no correctly predicted branches, no mispredicted branches}
+    RETURNS: dict {cycle nos. of correctly predicted branches, cycle no.s of mispredicted branches}
     """
     def Compute(self, executable: list) -> dict:
-        executable = [2, 31, 'mov rbx 31', 'mov rbp 36', 'mov rdi rbx', 'jmp 6', 'cmp rdi rbp', 'je 18', 'mov r10b [rdi]', 'cmp r10b [rdi+1]', 'jg 12', 'jmp 16', 'mov r11b [rdi+1]', 'mov [rdi] r11b', 'mov [rdi+1] r10b', 'jmp 16', 'inc rdi', 'jmp 6', 'dec rbp', 'cmp rbx rbp', 'je 23', 'mov rdi rbx', 'jmp 6', 'mov rdi 1', 'mov rsi 31', 'mov rdx 6', 'mov rax 1', 'syscall', 'mov rdi 0', 'mov rax 60', 'syscall', 81, 77, 68, 69, 74, 65]
         # Stage 1 - Move executable into memory
         for index, line in enumerate(executable):
             self.mainMemory.Store(f"[{index}]", line)
@@ -56,7 +60,6 @@ class Processor:
         # Stage 3 - Assign rip to start of text section
         self.registers.Store("ripw", self.registers.Load("cs")) # w, as cs is 2 bytes
         
-        cycleNumber = 0
         filterOpcode = None
         filterOperand = None
         filterCycle = None
@@ -72,7 +75,7 @@ class Processor:
 
             if (self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode\
                 or self.DEBUG["executedMicroOps"]["operand"] == filterOperand\
-                or cycleNumber == filterCycle)\
+                or self.cycleCount == filterCycle)\
                 and self.DEBUG["executedMicroOps"] != {"opcode": None, "operand": None, "operandSize": None}\
                 or (filterOpcode == None\
                 and filterOperand == None\
@@ -84,7 +87,7 @@ class Processor:
                 filterCycle = None
                 
                 print(f"""
-    -----------------------CYCLE {cycleNumber}-----------------------
+    -----------------------CYCLE {self.cycleCount}-----------------------
                     PROGRAM COUNTER: {self.registers.Load("rip")}
                     {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
                     Decoded: 
@@ -122,11 +125,11 @@ class Processor:
                                    "operand": None,
                                    "operandSize": None}}
             self.stalledStages["Fetch"] = False
-            cycleNumber += 1
+            self.cycleCount += 1
 
         # Stage 5 - Stop executing
-        print(f"DONE! In {cycleNumber} cycles\nHave a nice day :)")
-        return {0} # TODO: IMPLEMENT RETURNING CORRECT DICT (In fun definition)
+        print(f"DONE! In {self.cycleCount} cycles\nHave a nice day :)")
+        return self.predictionTracker # TODO: IMPLEMENT RETURNING CORRECT DICT (In fun definition)
             
 
 
@@ -471,6 +474,11 @@ class Processor:
             self.Flush()
             self.predictor.Stall()
             self.registers.Store("rip", nextFetchLocation)
+            # Add cycle number to misprediction tracker
+            self.predictionTracker["Mispredicted"].append(self.cycleCount)
+        else:
+            # Add cycle number to prediction tracker
+            self.predictionTracker["Predicted"].append(self.cycleCount)
 
         # Update branch predictor with result
         self.predictor.Update()

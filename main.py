@@ -1,6 +1,7 @@
 import os
 from Compiler.Compiler import Compiler
 from CPU.Processor import Processor
+import matplotlib.pyplot as plt
 
 C = Compiler()
 P = Processor()
@@ -28,9 +29,19 @@ with open(os.path.join(ALGORITHMS_PATH, f"{SelectedAlgorithm}"), 'r') as f:
 #print("Select Branch Predictor to run: ")
 
 ## Run on processor
-P.Compute(executable)
+predictionResults = P.Compute(executable)
 
 ## Display graph of mispredictions/cycles
+predictedY = [i for i in range(1, len(predictionResults["Predicted"]) + 1)]
+mispredictedY = [i for i in range(1, len(predictionResults["Mispredicted"]) + 1)]
+
+plt.title(SelectedAlgorithm)
+plt.xlabel("Cycles") 
+plt.ylabel("Total") 
+plt.plot(predictionResults["Mispredicted"], mispredictedY, "o-", color="blue", label="Mispredicted")
+plt.plot(predictionResults["Predicted"], predictedY, "o-", color="green", label="Predicted")
+plt.legend()
+plt.show()
 
 print("Yippee")
     
