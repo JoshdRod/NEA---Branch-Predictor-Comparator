@@ -45,10 +45,10 @@ class Processor:
     
     """
     Computes an executable algorithm inoput to it
-    INPUTS: list executable file to run
+    INPUTS: list executable file to run, bool run in debug mode or not
     RETURNS: dict {cycle nos. of correctly predicted branches, cycle no.s of mispredicted branches}
     """
-    def Compute(self, executable: list) -> dict:
+    def Compute(self, executable: list, debug: bool) -> dict:
         # Stage 1 - Move executable into memory
         for index, line in enumerate(executable):
             self.mainMemory.Store(f"[{index}]", line)
@@ -73,13 +73,20 @@ class Processor:
             if not self.stalledStages["Fetch"]:
                 self.Fetch()
 
-            if (self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode\
-                or self.DEBUG["executedMicroOps"]["operand"] == filterOperand\
-                or self.cycleCount == filterCycle)\
-                and self.DEBUG["executedMicroOps"] != {"opcode": None, "operand": None, "operandSize": None}\
-                or (filterOpcode == None\
-                and filterOperand == None\
-                and filterCycle == None):
+            if  (
+                    (
+                        (self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode and filterOpcode is not None)\
+                        or (self.DEBUG["executedMicroOps"]["operand"] == filterOperand and filterOperand is not None)\
+                        or (self.cycleCount == filterCycle and filterCycle is not None)\
+                    )\
+                    and not self.stalledStages["Execute"]\
+                )\
+                or (\
+                        filterOpcode == None\
+                        and filterOperand == None\
+                        and filterCycle == None\
+                    )\
+                and debug == True:
                 
                 # Reset filters
                 filterOpcode = None 

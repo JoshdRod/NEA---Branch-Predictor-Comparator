@@ -28,8 +28,17 @@ with open(os.path.join(ALGORITHMS_PATH, f"{SelectedAlgorithm}"), 'r') as f:
 ## TODO: Allow user to select branch predictors to run
 #print("Select Branch Predictor to run: ")
 
+
 ## Run on processor
-predictionResults = P.Compute(executable)
+debug = None
+while type(debug) != bool:
+    debug = input("Run in debug mode? (y/n): ").upper()
+    if debug == "Y":
+        debug = True
+    elif debug == "N":
+        debug = False
+
+predictionResults = P.Compute(executable, debug)
 
 ## Display graph of mispredictions/cycles
 predictedY = [i for i in range(1, len(predictionResults["Predicted"]) + 1)]
@@ -43,6 +52,4 @@ plt.plot(predictionResults["Predicted"], predictedY, "o-", color="green", label=
 plt.legend()
 plt.show()
 
-print("Yippee")
-    
 
