@@ -4,14 +4,21 @@ DATA:
     str name
     bool stalled
 FUNCTIONALITY:
+    Stall
+
+REQUIRED FUNCITONALITY ON SUBCLASSES:
     Predict
     Update
-    Stall
 """
 class BasePredictor:
     def __init__(self, name):
         self.name = name
         self._stalled = True
+    """
+    Sets predictor to stalled state (e.g: On mispredict, to ensure first instruction isn't skipped due to predicting rip + 1)
+    """
+    def Stall(self):
+        self.stalled = True
 
     """
     Predicts the next instruction to fetch based on the program counter
@@ -19,26 +26,20 @@ class BasePredictor:
     RETURNS: int predicted next program counter
     """
     def Predict(self, programCounter: int) -> int:
-        pass
+        raise NotImplementedError()
 
     """
     Updates branch target buffer with the given branch instruction
     INPUT int address of branch location
     """
-    def Update(self):
-        pass
+    def Update(self, location: int):
+        raise NotImplementedError()
 
-    """
-    Sets predictor to stalled state (e.g: On mispredict, to ensure first instruction isn't skipped due to predicting rip + 1)
-    """
-    def Stall(self):
-        pass
-
+# Always not taken
 class AlwaysNotTaken(BasePredictor): 
-    def __init__(self, name):
+    def __init__(self, name="Always Not Taken"):
         super.__init__(name)
 
-    stalled = True # Predictor stalls after an unsuccessful branch (e.g: branch to 10, fetch 10, then predict 11..)
     def Predict(self, programCounter: int):
         if self.stalled:
             self.stalled = False
@@ -46,9 +47,6 @@ class AlwaysNotTaken(BasePredictor):
         
         return programCounter + 1
 
-    def Update(self):
-        pass
-    
-    # Stall for 1 cycle after branch taken, to ensure first instuction not skipped
-    def Stall(self):
-        self.stalled = True
+    # No BTB in ANT, so no need for update
+    def Update(self, location: int):
+        return
