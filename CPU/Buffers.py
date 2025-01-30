@@ -149,27 +149,28 @@ REQUIRED FUNCTIONALITY ON SUBCLASSES:
 # TODO: IMPLEMENT HASH, THEN CREATE BTB AND IMPLEMMENT GETINDEXFROMITEM AND CREATEBUFFERITEM ON IT
 class HashTableBuffer(Buffer):
     def __init__(self, size, name):
-        super.__init__(size, name)
+        super().__init__(size, name)
 
     # Finds number of free spaces in hash table
     def GetNumberOfFreeSpaces(self) -> int:
-        return len(filter(lambda x: x is None, self._Buffer))
+        return len(list(filter(lambda x: x == {}, self._Buffer)))
 
-    # Hashes index, then uses hash to find value in hash table 
+    # Hashes mem address location, index, then uses hash to find value in hash table 
     def Get(self, index: int = 0) -> dict:
         # Hash
         key = self.Hash(index)
         # Search from key, until we hit an empty bin - in which case, value is not in table
         for i in range(self._SIZE):
             binPointer = (key + i) % self._SIZE
-            if self._Buffer[binPointer] is not None:
-                if self.GetIndexFromBufferItem(self._Buffer[binPointer]) == index:
-                    return binPointer
+            item = self._Buffer[binPointer]
+            if item != {}:
+                if self.GetIndexFromItem(item) == index:
+                    return item
 
             # -1 = Not in hash table
             return -1
         else:
-            raise Exception("Symbol Table is full!")
+            raise Exception(f"{self._NAME} is full!")
         
     # Hashes index of item, then uses that as key to insert into hash table
     def Add(self, item: dict|list, size: int =1):
@@ -181,16 +182,16 @@ class HashTableBuffer(Buffer):
 
         # Hash
         key = self.GetIndexFromItem(item)
-        key = self.Hash()
+        key = self.Hash(key)
 
         # Insert buffer item into buffer
         for i in range(self._SIZE):
-            if self._Buffer[(key + i) % self._SIZE] is not None: continue
+            if self._Buffer[(key + i) % self._SIZE] != {}: continue
 
             self._Buffer[(key + i) % self._SIZE] = self.CreateBufferItem(item)
             break
         else:
-            raise Exception("Symbol Table is full!")
+            raise Exception("Hash Table is full!")
         return
     
     """
@@ -199,7 +200,7 @@ class HashTableBuffer(Buffer):
     RETURNS: int hashed value
     """
     def Hash(self, value: int) -> int:
-        raise NotImplementedError()
+        return value % self._SIZE
     
     """
     Takes in a dict item to be added to / already in bin, and returns its index
@@ -261,6 +262,18 @@ class PipelineBuffer(CircularBuffer):
         
         return bufferItem
 
+# Buffer of branch instruction {from: location, to: location}
+class BranchTargetBuffer(HashTableBuffer):
+    def __init__(self, size: int = 16, name: str = "Branch Target Buffer"):
+        super().__init__(size, name)
 
-#class BranchTargetBuffer(Buffer):
+    def GetIndexFromItem(self, item: dict) -> int:
+        return item["from"]
+
+    def CreateBufferItem(self, item: dict) -> dict:
+        return {"from": item["from"],
+                "to": item["to"]}
     
+B = BranchTargetBuffer()
+
+breakpoint
