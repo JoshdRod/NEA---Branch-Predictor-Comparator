@@ -39,8 +39,8 @@ class BasePredictor:
 
 # Always not taken
 class AlwaysNotTaken(BasePredictor): 
-    def __init__(self, name="Always Not Taken"):
-        super.__init__(name, None) # None, as no BTB needed
+    def __init__(self, BTB, name="Always Not Taken"):
+        super().__init__(name, None) # None, as no BTB needed
 
     def Predict(self, programCounter: int):
         if self.stalled:
@@ -62,7 +62,7 @@ class AlwaysTaken(BasePredictor):
         if self.stalled == True:
             self.stalled = False
             return programCounter
-            
+
         ## Check if program counter is a key in BTB
         BTBEntry = self.BTB.Get(programCounter)
         ## If not, return pc + 1

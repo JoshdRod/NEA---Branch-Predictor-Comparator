@@ -15,12 +15,12 @@ from CPU.Registers import Registers
 
 class Processor:
 
-    def __init__(self):
+    def __init__(self, predictor: object):
         self.registers = Registers()
         self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
-        self.predictor = CPU.DirectionPredictors.AlwaysTaken(BranchTargetBuffer(32))
+        self.predictor = predictor(BranchTargetBuffer(32))
         self.AGU = AGU(self.registers)
 
         ## Control signals
