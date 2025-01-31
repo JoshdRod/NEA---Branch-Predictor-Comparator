@@ -226,7 +226,7 @@ class HashTableBuffer(Buffer):
 # Branch Target Buffer (Hash Table)
 # ----------------------------------------------------------------------------------------
 
-# Buffer of mu-op metadata [{opcode: __, speculative, ___}, ..]
+# Buffer of mu-op metadata [{opcode: __, location: ____, speculative, ___}, ..]
 class ReorderBuffer(CircularBuffer):
     def __init__(self, size: int = 16, name: str = "ROB"):
         super().__init__(size, name) # super() calls the method on the superclass
@@ -268,12 +268,9 @@ class BranchTargetBuffer(HashTableBuffer):
         super().__init__(size, name)
 
     def GetIndexFromItem(self, item: dict) -> int:
-        return item["from"]
+        return item["source"]
 
     def CreateBufferItem(self, item: dict) -> dict:
-        return {"from": item["from"],
-                "to": item["to"]}
+        return {"source": item["source"],
+                "destination": item["destination"]}
     
-B = BranchTargetBuffer()
-
-breakpoint

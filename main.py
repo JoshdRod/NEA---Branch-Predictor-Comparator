@@ -11,7 +11,7 @@ ALGORITHMS_PATH = os.path.join(CURRENT_PATH, "Algorithms")
 
 
 ## Allow user to select algorithm
-# Display files in algorithms folder
+# Display files  in algorithms folder
 AvailableAlgorithms = os.listdir(ALGORITHMS_PATH)
 print("Select which algorithm you would like to run: ")
 for index, alg in enumerate(AvailableAlgorithms):
