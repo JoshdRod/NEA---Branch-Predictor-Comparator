@@ -25,17 +25,21 @@ with open(os.path.join(ALGORITHMS_PATH, f"{SelectedAlgorithm}"), 'r') as f:
     executable = C.Compile(f)
     print("Compiled to executable!")
 
-## TODO: Allow user to select branch predictors to run
+## Allow user to select branch predictor to run
 while True:
     print("Select Branch Predictor to run: ")
-    print("""0. Always not taken
-1. Always taken""")
+    print("""0. Always Not Taken
+1. Always Taken
+2. Last Time""")
     match input():
         case '0':
             predictor = CPU.DirectionPredictors.AlwaysNotTaken
             break
         case '1':
             predictor = CPU.DirectionPredictors.AlwaysTaken
+            break
+        case '2':
+            predictor = CPU.DirectionPredictors.LastTime
             break
         case _:
             continue

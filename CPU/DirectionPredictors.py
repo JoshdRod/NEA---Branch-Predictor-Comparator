@@ -32,9 +32,9 @@ class BasePredictor:
 
     """
     Updates branch target buffer with the given branch instruction
-    INPUT int branch source location, int branch destination location
+    INPUT int branch source location, int branch destination location, bool branch outcome (T = Taken, F = Not taken)
     """
-    def Update(self, source: int, destination: int):
+    def Update(self, source: int, destination: int, branchOutcome: bool):
         raise NotImplementedError()
 
 # Always not taken
@@ -50,7 +50,7 @@ class AlwaysNotTaken(BasePredictor):
         return programCounter + 1
 
     # No BTB in ANT, so no need for update
-    def Update(self, source: int, destination: int):
+    def Update(self, source: int, destination: int, branchOutcome: bool):
         return
 
 # Always Taken
@@ -71,7 +71,7 @@ class AlwaysTaken(BasePredictor):
         ## If so, return destination of found entry
         return BTBEntry["destination"]
     
-    def Update(self, source: int, destination: int):
+    def Update(self, source: int, destination: int, branchOutcome: bool):
         ## Check if source already in BTB
         sourceInBTB = type(self.BTB.Get(source)) is dict
         ## If so, return
@@ -80,3 +80,40 @@ class AlwaysTaken(BasePredictor):
         ## If not, add it
         self.BTB.Add({"source": source,
                       "destination": destination})
+        
+class LastTime(BasePredictor):
+    def __init__(self, BTB, name="Last Time"):
+        super().__init__(name, BTB)
+        self.lastBranchOutcome = True
+
+    def Predict(self, programCounter: int) -> int:
+        if self.stalled == True:
+            self.stalled = False
+            return programCounter
+
+        ## Check if program counter is a key in BTB
+        BTBEntry = self.BTB.Get(programCounter)
+        # If not, return pc + 1
+        if type(BTBEntry) != dict:
+            return programCounter + 1
+        
+        ## Check outcome of last branch
+        # If last branch taken, return btb entry
+        if self.lastBranchOutcome == True:
+            return BTBEntry["destination"]
+        # If not taken, return pc + 1
+        return programCounter + 1
+    
+    def Update(self, source: int, destination: int, branchOutcome: bool):
+        ## Set lastBranchOutcome to the branch's outcome
+        self.lastBranchOutcome = branchOutcome
+
+        ## Check if source already in BTB
+        sourceInBTB = type(self.BTB.Get(source)) is dict
+        ## If so, return
+        if sourceInBTB:
+            return
+        ## If not, add it
+        self.BTB.Add({"source": source,
+                      "destination": destination})
+        

@@ -471,7 +471,7 @@ class Processor:
         # Update branch predictor with result
         branchSource = self.reorderBuffer.Get()["location"]
         branchDestination = self.registers.Load("raxb")
-        self.predictor.Update(branchSource, branchDestination)
+        self.predictor.Update(branchSource, branchDestination, comparisonMet)
 
         # If met, next fetch location = rax
         if comparisonMet:
@@ -493,7 +493,6 @@ class Processor:
 
         return # TODO: Test adding to BTB works
 
-    # TODO: Make actually work
     # SYSCALL
     # Performs a OS call operation (like printing to screen)
     def Syscall(self):
