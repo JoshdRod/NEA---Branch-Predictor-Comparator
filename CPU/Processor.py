@@ -1,8 +1,7 @@
 """
 TODO:
 - Implement branch predictors!
-- Cycle number filter doesn't always seem to jump to the correct cycle number?
-- Change processor operating mode - currently, branch prediction doesn't improve anything, because there's no misfetch penalty
+- Rename all load functions to get
 - Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
 - Fix fact that all computed memory addresses can't contain spaces in the compiler (e.g: Won't accept "[rax + 5]" must be "[rax+5]")
 - A direct CPU interface would be nice (like the IDLE interpreter)
@@ -10,18 +9,18 @@ TODO:
 
 from CPU.MainMemory import MainMemory
 import CPU.DirectionPredictors
-from CPU.Buffers import ReorderBuffer, PipelineBuffer
+from CPU.Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer
 from CPU.AddressGenerationUnit import AGU
 from CPU.Registers import Registers
 
 class Processor:
 
-    def __init__(self):
-        self.predictor = CPU.DirectionPredictors.BasePredictor() # TODO
+    def __init__(self, predictor: object):
         self.registers = Registers()
         self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
+        self.predictor = predictor(BranchTargetBuffer(32))
         self.AGU = AGU(self.registers)
 
         ## Control signals
@@ -79,7 +78,7 @@ class Processor:
                         or (self.DEBUG["executedMicroOps"]["operand"] == filterOperand and filterOperand is not None)\
                         or (self.cycleCount == filterCycle and filterCycle is not None)\
                     )\
-                    and not self.stalledStages["Execute"]\
+                    #and not self.stalledStages["Execute"]\
                 )\
                 or (\
                         filterOpcode == None\
@@ -469,11 +468,16 @@ class Processor:
             case "mp":
                 comparisonMet = True
 
+        # Update branch predictor with result
+        branchSource = self.reorderBuffer.Get()["location"]
+        branchDestination = self.registers.Load("raxb")
+        self.predictor.Update(branchSource, branchDestination)
+
         # If met, next fetch location = rax
         if comparisonMet:
             nextFetchLocation = self.registers.Load("rax")
         else:
-            nextFetchLocation = self.reorderBuffer.Get()["location"]
+            nextFetchLocation = self.reorderBuffer.Get()["location"] + 1 # +1 as want intruction AFTER branch
 
         # Check if direction of branch correctly predicted - if not, flush pipeline, stall predictor, and point rip to correct address
         nextMu_op = self.reorderBuffer.Get(1)
@@ -487,9 +491,7 @@ class Processor:
             # Add cycle number to prediction tracker
             self.predictionTracker["Predicted"].append(self.cycleCount)
 
-        # Update branch predictor with result
-        self.predictor.Update()
-        return
+        return # TODO: Test adding to BTB works
 
     # TODO: Make actually work
     # SYSCALL

@@ -1,17 +1,17 @@
 import os
 from Compiler.Compiler import Compiler
 from CPU.Processor import Processor
+import CPU.DirectionPredictors
 import matplotlib.pyplot as plt
 
 C = Compiler()
-P = Processor()
 
 CURRENT_PATH = os.curdir
 ALGORITHMS_PATH = os.path.join(CURRENT_PATH, "Algorithms")
 
 
 ## Allow user to select algorithm
-# Display files in algorithms folder
+# Display files  in algorithms folder
 AvailableAlgorithms = os.listdir(ALGORITHMS_PATH)
 print("Select which algorithm you would like to run: ")
 for index, alg in enumerate(AvailableAlgorithms):
@@ -26,8 +26,21 @@ with open(os.path.join(ALGORITHMS_PATH, f"{SelectedAlgorithm}"), 'r') as f:
     print("Compiled to executable!")
 
 ## TODO: Allow user to select branch predictors to run
-#print("Select Branch Predictor to run: ")
+while True:
+    print("Select Branch Predictor to run: ")
+    print("""0. Always not taken
+1. Always taken""")
+    match input():
+        case '0':
+            predictor = CPU.DirectionPredictors.AlwaysNotTaken
+            break
+        case '1':
+            predictor = CPU.DirectionPredictors.AlwaysTaken
+            break
+        case _:
+            continue
 
+P = Processor(predictor)
 
 ## Run on processor
 debug = None
