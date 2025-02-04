@@ -201,20 +201,23 @@ class HashTableBuffer(Buffer):
         return
     
     # Hash index, find index in table, then replace current item in table with item
-    def Update(self, index: int, item: dict):
-        key = self.Hash(index)
+    def Update(self, item: dict):
+        source = self.GetIndexFromItem(item)
+        key = self.Hash(source)
         
         # Search from key, until we hit an empty bin - in which case, value is not in table
         for i in range(self._SIZE):
             binPointer = (key + i) % self._SIZE
             currentItem = self._Buffer[binPointer]
             if currentItem != {}:
-                if self.GetIndexFromItem(currentItem) == index:
+                # Check if item has correct source location
+                if self.GetIndexFromItem(currentItem) == source:
                     # Replace current item with item
                     self._Buffer[binPointer] = item
+                    return
 
             # -1 = Not in hash table
-            return -1
+            raise Exception(f"Tried to add {item} to table, but {source} doesn't exist in table!")
         else:
             raise Exception(f"{self._NAME} is full!")
         

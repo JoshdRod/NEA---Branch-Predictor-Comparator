@@ -8,8 +8,7 @@ TODO:
 """
 
 from CPU.MainMemory import MainMemory
-import CPU.DirectionPredictors
-from CPU.Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer
+from CPU.Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer, DirectionBuffer
 from CPU.AddressGenerationUnit import AGU
 from CPU.Registers import Registers
 
@@ -20,7 +19,7 @@ class Processor:
         self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
-        self.predictor = predictor(BranchTargetBuffer(32))
+        self.predictor = predictor(BranchTargetBuffer(32), DirectionBuffer(32))
         self.AGU = AGU(self.registers)
 
         ## Control signals
