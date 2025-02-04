@@ -11,6 +11,7 @@ from CPU.MainMemory import MainMemory
 from CPU.Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer, DirectionBuffer
 from CPU.AddressGenerationUnit import AGU
 from CPU.Registers import Registers
+import time
 
 class Processor:
 
@@ -61,6 +62,7 @@ class Processor:
         filterOpcode = None
         filterOperand = None
         filterCycle = None
+
         # Stage 4 - Fetch, Decode, Execute, until exit syscall changes running flag
         while self.running:
             # Ignore stalled parts of pipeline
@@ -70,6 +72,26 @@ class Processor:
                 self.Decode()
             if not self.stalledStages["Fetch"]:
                 self.Fetch()
+
+            print(f"""
+    -----------------------CYCLE {self.cycleCount}-----------------------
+                    PROGRAM COUNTER: {self.registers.Load("rip")}
+                    {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
+                    Decoded: 
+                    {f"{self.DEBUG["decodedInstruction"]} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
+                    Executed: 
+                    {f"{self.DEBUG["executedMicroOps"]}." if self.DEBUG["executedMicroOps"]["opcode"] is not None else "Execute Stalled!"}
+                    
+                    Pipeline: {self.pipelineBuffer._Buffer}
+                    (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
+
+                    Re-Order Buffer: {self.reorderBuffer._Buffer}
+                    (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
+
+                    Registers: {self.registers.Registers.items()}
+
+                    Main Memory: {self.mainMemory.__data__}
+            """)
 
             if  (
                     (
@@ -91,25 +113,7 @@ class Processor:
                 filterOperand = None
                 filterCycle = None
                 
-                print(f"""
-    -----------------------CYCLE {self.cycleCount}-----------------------
-                    PROGRAM COUNTER: {self.registers.Load("rip")}
-                    {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
-                    Decoded: 
-                    {f"{self.DEBUG["decodedInstruction"]} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
-                    Executed: 
-                    {f"{self.DEBUG["executedMicroOps"]}." if self.DEBUG["executedMicroOps"]["opcode"] is not None else "Execute Stalled!"}
-                    
-                    Pipeline: {self.pipelineBuffer._Buffer}
-                    (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
-
-                    Re-Order Buffer: {self.reorderBuffer._Buffer}
-                    (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
-
-                    Registers: {self.registers.Registers.items()}
-
-                    Main Memory: {self.mainMemory.__data__}
-
+                print("""
                     NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
                     """)
 
@@ -131,6 +135,7 @@ class Processor:
                                    "operandSize": None}}
             self.stalledStages["Fetch"] = False
             self.cycleCount += 1
+            time.sleep(0.05)
 
         # Stage 5 - Stop executing
         print(f"DONE! In {self.cycleCount} cycles\nHave a nice day :)")
