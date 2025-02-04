@@ -7,6 +7,7 @@ list Buffer itself
 
 FUNCTIONALITY:
 Add/Remove
+Update (a specific index in buffer)
 Get (a specific index in buffer)
 GetNumberOfFreeSpaces (left)
 """
@@ -44,6 +45,13 @@ class Buffer:
     Remove item at front of buffer
     """
     def Remove(self):
+        raise NotImplementedError()
+    
+    """
+    Updates table by replacing the item in the table with an updated version
+    INPUTS: int index to replace at, dict item to replace with
+    """
+    def Update(self, index: int, item: dict):
         raise NotImplementedError()
 
     """
@@ -145,8 +153,6 @@ REQUIRED FUNCTIONALITY ON SUBCLASSES:
     GetIndexFromItem (Takes in a value to be added to/ in bin, and returns the unique index identifier from it)
     CreateBufferItem (formats the item fed into Add, so that it can be added to the table with the correct information)
 """
-
-# TODO: IMPLEMENT HASH, THEN CREATE BTB AND IMPLEMMENT GETINDEXFROMITEM AND CREATEBUFFERITEM ON IT
 class HashTableBuffer(Buffer):
     def __init__(self, size, name):
         super().__init__(size, name)
@@ -194,6 +200,28 @@ class HashTableBuffer(Buffer):
             raise Exception("Hash Table is full!")
         return
     
+    # Hash index, find index in table, then replace current item in table with item
+    def Update(self, item: dict):
+        source = self.GetIndexFromItem(item)
+        key = self.Hash(source)
+        
+        # Search from key, until we hit an empty bin - in which case, value is not in table
+        for i in range(self._SIZE):
+            binPointer = (key + i) % self._SIZE
+            currentItem = self._Buffer[binPointer]
+            if currentItem != {}:
+                # Check if item has correct source location
+                if self.GetIndexFromItem(currentItem) == source:
+                    # Replace current item with item
+                    self._Buffer[binPointer] = item
+                    return
+
+            # -1 = Not in hash table
+            raise Exception(f"Tried to add {item} to table, but {source} doesn't exist in table!")
+        else:
+            raise Exception(f"{self._NAME} is full!")
+        
+
     """
     Hashes integer
     INPUT: int value
@@ -273,4 +301,16 @@ class BranchTargetBuffer(HashTableBuffer):
     def CreateBufferItem(self, item: dict) -> dict:
         return {"source": item["source"],
                 "destination": item["destination"]}
+    
+# Buffer of branch locations, and wether to predict taken or not
+class DirectionBuffer(HashTableBuffer):
+    def __init__(self, size: int = 16, name: str = "Branch Direction Buffer"):
+        super().__init__(size, name)
+
+    def GetIndexFromItem(self, item: dict) -> int:
+        return item["source"]
+
+    def CreateBufferItem(self, item: dict) -> dict:
+        return {"source": item["source"],
+                "taken": item["taken"]}
     

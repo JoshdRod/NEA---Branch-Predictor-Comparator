@@ -11,9 +11,10 @@ REQUIRED FUNCITONALITY ON SUBCLASSES:
     Update
 """
 class BasePredictor:
-    def __init__(self, name, BranchTargetBuffer: object):
+    def __init__(self, name, branchTargetBuffer: object, directionBuffer: object):
         self.name = name
-        self.BTB = BranchTargetBuffer
+        self.BTB = branchTargetBuffer
+        self.DirectionBuffer = directionBuffer
         self.stalled = True
 
     """
@@ -39,8 +40,8 @@ class BasePredictor:
 
 # Always not taken
 class AlwaysNotTaken(BasePredictor): 
-    def __init__(self, BTB, name="Always Not Taken"):
-        super().__init__(name, None) # None, as no BTB needed
+    def __init__(self, BTB, directionBuffer, name="Always Not Taken"):
+        super().__init__(name, None, None) # None, as no BTB needed
 
     def Predict(self, programCounter: int):
         if self.stalled:
@@ -55,8 +56,8 @@ class AlwaysNotTaken(BasePredictor):
 
 # Always Taken
 class AlwaysTaken(BasePredictor):
-    def __init__(self, BTB, name="Always Taken"):
-        super().__init__(name, BTB)
+    def __init__(self, BTB, directionBuffer, name="Always Taken"):
+        super().__init__(name, BTB, None)
 
     def Predict(self, programCounter: int) -> int:
         if self.stalled == True:
@@ -82,9 +83,8 @@ class AlwaysTaken(BasePredictor):
                       "destination": destination})
         
 class LastTime(BasePredictor):
-    def __init__(self, BTB, name="Last Time"):
-        super().__init__(name, BTB)
-        self.lastBranchOutcome = True
+    def __init__(self, BTB, directionBuffer, name="Last Time"):
+        super().__init__(name, BTB, directionBuffer)
 
     def Predict(self, programCounter: int) -> int:
         if self.stalled == True:
@@ -97,9 +97,9 @@ class LastTime(BasePredictor):
         if type(BTBEntry) != dict:
             return programCounter + 1
         
-        ## Check outcome of last branch
-        # If last branch taken, return btb entry
-        if self.lastBranchOutcome == True:
+        ## Check outcome of last instance of this branch
+        # If last instance of this branch taken, return btb entry
+        if self.DirectionBuffer.Get(programCounter)["taken"]:
             return BTBEntry["destination"]
         # If not taken, return pc + 1
         return programCounter + 1
@@ -107,13 +107,24 @@ class LastTime(BasePredictor):
     def Update(self, source: int, destination: int, branchOutcome: bool):
         ## Set lastBranchOutcome to the branch's outcome
         self.lastBranchOutcome = branchOutcome
+        btbItem = {"source": source,
+                    "destination": destination}
+        directionItem = {"source": source,
+                         "taken": self.lastBranchOutcome}
 
-        ## Check if source already in BTB
+        ## Update BTB
+        # Check if source already in BTB
         sourceInBTB = type(self.BTB.Get(source)) is dict
-        ## If so, return
-        if sourceInBTB:
-            return
         ## If not, add it
-        self.BTB.Add({"source": source,
-                      "destination": destination})
+        if not sourceInBTB:
+            self.BTB.Add(btbItem)
+        
+        ## Update Direction Buffer
+        sourceInDirectionBuffer = type(self.DirectionBuffer.Get(source)) is dict
+        # If so, update
+        if sourceInDirectionBuffer:
+            self.DirectionBuffer.Update(directionItem)
+            return
+        # If not, add it
+        self.DirectionBuffer.Add(directionItem)
         
