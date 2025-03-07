@@ -30,7 +30,7 @@ while True:
     print("Select Branch Predictor to run: ")
     print("""0. Always Not Taken
 1. Always Taken
-2. Last Time""")
+2. One-Bit Last Time""")
     match input():
         case '0':
             predictor = CPU.DirectionPredictors.AlwaysNotTaken
@@ -39,7 +39,7 @@ while True:
             predictor = CPU.DirectionPredictors.AlwaysTaken
             break
         case '2':
-            predictor = CPU.DirectionPredictors.LastTime
+            predictor = CPU.DirectionPredictors.OneBitLastTime
             break
         case _:
             continue
