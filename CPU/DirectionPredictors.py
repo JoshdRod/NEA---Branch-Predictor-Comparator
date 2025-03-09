@@ -1,3 +1,4 @@
+import CPU.Buffers as Buffers
 """
 Branch Predictor Interface
 DATA:
@@ -11,7 +12,7 @@ REQUIRED FUNCITONALITY ON SUBCLASSES:
     Update
 """
 class BasePredictor:
-    def __init__(self, branchTargetBuffer: object, directionBuffer: object, name: str):
+    def __init__(self, branchTargetBuffer: type[Buffers.BranchTargetBuffer], directionBuffer: type[Buffers.DirectionBuffer], name: str):
         self.name = name
         self.BTB = branchTargetBuffer # BTB stores location branches branch to {from: --, to: --}
         self.DirectionBuffer = directionBuffer # Direction Buffer stores whether to predict a branch taken or not {source: --, taken: --}
@@ -82,6 +83,16 @@ class AlwaysTaken(BasePredictor):
         self.BTB.Add({"source": source,
                       "destination": destination})
         
+"""
+Base Last Time Predictor - Predicts direction based on last n times that branch was reached
+EXTRA DATA:
+
+EXTRA FUNCTIONALITY:
+
+REQUIRED FUNCTIONALITY ON SUBCLASSES:
+    CheckIfBranchShouldBePredicted (Takes in branch location, then checks direction buffer to see what to predict)
+    CalculateNewDirectionUncertainty (Takes in branch location, and updates certainty to reflect outcome of this cycle)
+"""
 class BaseLastTime(BasePredictor):
     def __init__(self, BTB, directionBuffer, name):
         super().__init__(BTB, directionBuffer, name)
@@ -106,12 +117,12 @@ class BaseLastTime(BasePredictor):
         return programCounter + 1
     
     def Update(self, source: int, destination: int, branchOutcome: bool):
-        ## Set lastBranchOutcome to the branch's outcome
-        self.newDirectionCertainty = self.CalculateNewDirectionCertainty(branchOutcome)
+        ## Create Items to add to BTB and Direction Buffer
+        self.newDirectionCertainty = self.CalculateNewDirectionCertainty(source, branchOutcome)
         btbItem = {"source": source,
                     "destination": destination}
         directionItem = {"source": source,
-                         "taken": self.newDirectionCertainty}
+                         "certainty": self.newDirectionCertainty}
 
         ## Update BTB
         # Check if source already in BTB
@@ -129,22 +140,71 @@ class BaseLastTime(BasePredictor):
         # If not, add it
         self.DirectionBuffer.Add(directionItem)
 
+    """
+    Checks if direction certainty indicates branch should be predicted taken
+    INPUTS: int current program counter
+    RETURNS: bool whether branch should be predicted or not
+    """
     def CheckIfBranchShouldBePredicted(self, programCounter: int) -> bool:
-        raise NotImplementedError
+        raise NotImplementedError()
     
-    def CalculateNewDirectionCertainty(self, previousBranchOutcome: bool) -> int:
-        raise NotImplementedError
+    """
+    Takes in result of current branch (predicted/mispredicted), and returns new certainty
+    INPUTS: int current program counter, bool outcome of branch
+    RETURNS:
+    """
+    def CalculateNewDirectionCertainty(self, programCounter: int, branchOutcome: bool) -> int:
+        raise NotImplementedError()
 
 class OneBitLastTime(BaseLastTime):
     def __init__(self, BTB, directionBuffer, name="1 bit Last Time"):
         super().__init__(BTB, directionBuffer, name)
 
-    def CheckIfBranchShouldBePredicted(self, programCounter: int) -> bool:
-        return self.DirectionBuffer.Get(programCounter)["taken"]
+    ## DIRECTION CERTAINTY GUIDE
+    # -------------------------------
+    # True - Predict Taken
+    # False - Preict Not Taken
+    # -------------------------------
 
-    def CalculateNewDirectionCertainty(self, previousBranchOutcome: bool) -> int:
-        return previousBranchOutcome
+    def CheckIfBranchShouldBePredicted(self, programCounter: int) -> bool:
+        return self.DirectionBuffer.Get(programCounter)["certainty"]
+
+    def CalculateNewDirectionCertainty(self, programCounter: int, branchOutcome: bool) -> int:
+        return branchOutcome
         
-class TwoBit(BasePredictor):
+class TwoBitLastTime(BaseLastTime):
     def __init__(self, BTB, directionBuffer, name="Two Bit"):
         super().__init__(BTB, directionBuffer, name)
+
+    ## DIRECTION CERTAINTY GUIDE
+    # -------------------------------
+    # 3 - Double Predict Taken
+    # 2 - Predict Taken
+    # -------------------------------
+    # 1 - Predict Not Taken
+    # 0 - Double Predict Not Taken
+    # --------------------------------
+
+    def CheckIfBranchShouldBePredicted(self, programCounter: int) -> bool:
+        sourceInDirectionBuffer = self.DirectionBuffer.Get(programCounter)
+        certainty = sourceInDirectionBuffer["certainty"]
+
+        return True if certainty >= 2 else False
+
+    def CalculateNewDirectionCertainty(self, programCounter: int, branchOutcome: bool) -> int:
+        # Find branch in direction buffer
+        sourceInDirectionBuffer = self.DirectionBuffer.Get(programCounter)
+        # If not in direction buffer, return 2 if predicted taken, 1 if predicted not taken
+        if type(sourceInDirectionBuffer) is not dict:
+            return 2 if branchOutcome else 1
+        # If in buffer, find current certainty
+        else:
+            # If outcome = taken, add 1 if certainty not 3
+            certainty = sourceInDirectionBuffer["certainty"]
+            if branchOutcome:
+                return certainty if certainty == 4 else certainty + 1
+            # If not taken, sub 1 if certainty not 0 
+            else:
+                return certainty if certainty == 0 else certainty - 1
+            
+breakpoint

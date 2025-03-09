@@ -312,5 +312,5 @@ class DirectionBuffer(HashTableBuffer):
 
     def CreateBufferItem(self, item: dict) -> dict:
         return {"source": item["source"],
-                "taken": item["taken"]}
+                "certainty": item["certainty"]}
     
