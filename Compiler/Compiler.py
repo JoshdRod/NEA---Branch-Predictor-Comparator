@@ -82,8 +82,10 @@ class Compiler:
     # and all subsequent, are going to be off by an offset of 1. This offset increases for every new label defined
     # But we're not.. and I've not no clue why...
     def GenerateSymbolTable(self, symbols: list):
-        for symbol in symbols:
-            #location = "0x" + str(symbol["location"])
+        if len(symbols) == 0:
+            return
+        else:
+            symbol = symbols.pop()
             # Hash
             key = self.hash(symbol["name"])
             # Insert dict {name: memory location} into index of hash in symbol table
@@ -94,7 +96,7 @@ class Compiler:
                 break
             else:
                 raise Exception("Symbol Table is full!")
-        return
+            return self.GenerateSymbolTable(symbols)
 
     """
     Takes in line of code, and, if part of the line is a symbol, converts it to the corresponding memory address in the symbol table
@@ -185,5 +187,4 @@ class Compiler:
 # C = Compiler()
 # C.Compile("test2.txt")
 
-
-
+breakpoint
