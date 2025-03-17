@@ -12,16 +12,8 @@ class Compiler:
         # Read in file
         asm = f.readlines()
 
-        ## GENERIC
-        # Remove Empty lines/indentation
-        asm = list(filter(lambda x: not x.isspace(), asm)) # isspace returns true of whole string only consists of spaces
-        asm = list(map(lambda x: x.strip(), asm))
-        # Remove Whole line Comments
-        asm = list(filter(lambda x: not x.startswith(';'), asm)) # Filter only returns elements that return true out of the function
-        # Remove inline Comments
-        asm = list(map(lambda x: x[:x.find(';') - 1] if x.find(';') != -1 else x, asm)) # Find returns 1st instance of substring in string (or -1 if not found)
-        # Remove all commas from entries
-        asm = list(map(lambda x: x.replace(',', ''), asm))
+        ## Convert to General Form
+        asm = self.ConvertToGeneralForm(asm)
 
         ##DATA SECTION
         # Find the start and end of data section
@@ -77,6 +69,24 @@ class Compiler:
         # Final pass - remove symbols
         executable = list(map(self.ReplaceSymbols, executable))
         return executable
+
+    """
+    Converts Assembly file into a generalised form, without whitespace and comments, in order for compilation to begin
+    INPUTS: str Assembly file to generalise
+    RETURNS: str Assembly file in General Form
+    """
+    def ConvertToGeneralForm(self, asm: str) -> str:
+        # Remove Empty lines/indentation
+        asm = list(filter(lambda x: not x.isspace(), asm)) # isspace returns true of whole string only consists of spaces
+        asm = list(map(lambda x: x.strip(), asm))
+        # Remove Whole line Comments
+        asm = list(filter(lambda x: not x.startswith(';'), asm)) # Filter only returns elements that return true out of the function
+        # Remove inline Comments
+        asm = list(map(lambda x: x[:x.find(';') - 1] if x.find(';') != -1 else x, asm)) # Find returns 1st instance of substring in string (or -1 if not found)
+        # Remove all commas from entries
+        asm = list(map(lambda x: x.replace(',', ''), asm))
+
+        return asm
 
     # Should get an error, because as when the label is eventually removed from the source code, its pointer,
     # and all subsequent, are going to be off by an offset of 1. This offset increases for every new label defined
@@ -182,9 +192,3 @@ class Compiler:
         else:
             endPointer = None
         return asm[startPointer : endPointer]
-        
-
-# C = Compiler()
-# C.Compile("test2.txt")
-
-breakpoint
