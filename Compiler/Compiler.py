@@ -72,10 +72,10 @@ class Compiler:
 
     """
     Converts Assembly file into a generalised form, without whitespace and comments, in order for compilation to begin
-    INPUTS: str Assembly file to generalise
-    RETURNS: str Assembly file in General Form
+    INPUTS: list lines of Assembly file to generalise
+    RETURNS: list Assembly file in General Form
     """
-    def ConvertToGeneralForm(self, asm: str) -> str:
+    def ConvertToGeneralForm(self, asm: list) -> list:
         # Remove Empty lines/indentation
         asm = list(filter(lambda x: not x.isspace(), asm)) # isspace returns true of whole string only consists of spaces
         asm = list(map(lambda x: x.strip(), asm))
@@ -192,3 +192,5 @@ class Compiler:
         else:
             endPointer = None
         return asm[startPointer : endPointer]
+
+breakpoint
