@@ -184,7 +184,10 @@ class Compiler:
     RETURNS: string[] section in asm file, from start to end
     """
     def FindSection(self, asm: list, sectionName: str) -> list:
-        startPointer = asm.index('section .' + sectionName) + 1
+        try:
+            startPointer = asm.index('section .' + sectionName) + 1
+        except ValueError:
+            raise Exception(f"Tried to compile with invalid {sectionName} section")
         for i in range(startPointer, len(asm)):
             if "section" in asm[i]: 
                 endPointer = i
