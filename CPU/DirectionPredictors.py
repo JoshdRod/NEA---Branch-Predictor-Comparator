@@ -39,6 +39,10 @@ class BasePredictor:
     def Update(self, source: int, destination: int, branchOutcome: bool):
         raise NotImplementedError()
 
+## -----------------------------------------
+# STATIC PREDICTORS
+## -----------------------------------------
+
 # Always not taken
 class AlwaysNotTaken(BasePredictor): 
     def __init__(self, BTB, directionBuffer, name="Always Not Taken"):
@@ -82,7 +86,11 @@ class AlwaysTaken(BasePredictor):
         ## If not, add it
         self.BTB.Add({"source": source,
                       "destination": destination})
-        
+
+## -----------------------------------------
+# LOCAL PREDICTORS
+## -----------------------------------------
+    
 """
 Base Last Time Predictor - Predicts direction based on last n times that branch was reached
 EXTRA DATA:
@@ -206,5 +214,24 @@ class TwoBitLastTime(BaseLastTime):
             # If not taken, sub 1 if certainty not 0 
             else:
                 return certainty if certainty == 0 else certainty - 1
-            
+
+## -----------------------------------------
+# GLOBAL PREDICTORS
+## -----------------------------------------
+
+class gshare(BasePredictor):
+    # Creates an 8 bit global history register
+    def __init__(self, BTB, directionBuffer, name="gshare"):
+        super().__init__(BTB, directionBuffer, name)
+        self.GlobalHistoryRegister = Buffers.CircularBuffer(8) # TODO: Would be cool to allow user to modify this
+
+    def Predict(self, programCounter):
+        # XOR program counter and GHR
+        BTBIndex = programCounter ^ self.GlobalHistoryRegister # ^ denotes bitwise XOR
+        # Index Direction Predictor, return result
+        return self.DirectionBuffer.Get(BTBIndex)
+    
+    def Update(self, source, destination, branchOutcome):
+        return super().Update(source, destination, branchOutcome)
+
 breakpoint

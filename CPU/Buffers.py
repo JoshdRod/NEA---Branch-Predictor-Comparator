@@ -90,8 +90,8 @@ class CircularBuffer(Buffer):
     def Get(self, index: int = 0) -> dict:
         return self._Buffer[(self._frontPointer + index) % 16]
     
-    # Uses pointers to add item/lists of items at end of buffer
-    def Add(self, item: str|list, size: int, data: dict = None):
+    # Uses pointers to add item/lists of items at end of buffer (data = metadata (e.g: instruction location))
+    def Add(self, item: str|list, size: int = 1, data: dict = None):
         # If given list of items, add them all iteratively
         if type(item) == list:
             for i in item:
