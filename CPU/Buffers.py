@@ -17,7 +17,7 @@ class Buffer:
         self._NAME = name # Used when broadcasting errors
         
         self._SIZE = size
-        self._Buffer = [{} for i in range(self._SIZE)] # Buffer has size 16 bytes (or 16 mu-ops)
+        self._Buffer = [{} for i in range(self._SIZE)]
 
     """
     Gets no. of unallocated bytes in buffer
@@ -88,19 +88,23 @@ class CircularBuffer(Buffer):
     
     # Uses pointers to get item at correct index
     def Get(self, index: int = 0) -> dict:
-        return self._Buffer[(self._frontPointer + index) % 16]
+        return self._Buffer[(self._frontPointer + index) % self._SIZE]
     
     # Uses pointers to add item/lists of items at end of buffer (data = metadata (e.g: instruction location))
     def Add(self, item: str|list, size: int = 1, data: dict = None):
         # If given list of items, add them all iteratively
         if type(item) == list:
             for i in item:
-                self.Add(i, size, data)
-            return # Recursion isn't very KISS here, use iteration
+                self.AddElement(i, size, data)
+        else:
+            self.AddElement(item, size, data)
+        return 
         
+    # Adding elements separated from handling lists of elements to add (KISS)
+    def AddElement(self, item: str|bool, size: int, data: dict):
         # If a single item, add to buffer
         # Check if buffer full
-        if (self._frontPointer - 1) % 16 == self._rearPointer:
+        if (self._frontPointer - 1) % self._SIZE == self._rearPointer:
             raise Exception(f"{self._NAME} Full!")
         
         # If buffer empty, set start pointer back to 0
@@ -111,7 +115,7 @@ class CircularBuffer(Buffer):
         bufferItem = self.CreateBufferItem(item, size, data)
 
         # Add buffer item to end of buffer
-        self._rearPointer = (self._rearPointer + 1) % 16
+        self._rearPointer = (self._rearPointer + 1) % self._SIZE
         self._Buffer[self._rearPointer] = bufferItem
 
     # Uses pointers to remove from end of buffer
@@ -126,7 +130,7 @@ class CircularBuffer(Buffer):
             self._frontPointer = self._rearPointer = -1
         # Else, move front pointer along 1
         else:
-            self._frontPointer = (self._frontPointer + 1) % 16
+            self._frontPointer = (self._frontPointer + 1) % self._SIZE
 
     def Flush(self):
         self._frontPointer = -1
@@ -251,6 +255,7 @@ class HashTableBuffer(Buffer):
 ### BUFFER IMPLEMENTATIONS 
 # Re-Order Buffer (Circular)
 # Pipeline Buffer (Circular)
+# Global History Register (Circular)
 # Branch Target Buffer (Hash Table)
 # ----------------------------------------------------------------------------------------
 
@@ -272,7 +277,7 @@ class PipelineBuffer(CircularBuffer):
 
     # Expected input: mu-op, w/ a * at end if it's speculative (Not expecting any extra data)
     def CreateBufferItem(self, item: str, operandSize: int, data: dict) -> dict:
-        bufferItem = {"opcode": None, "operand": None, "operandSize": operandSize} # operandSize is the no. bytes the operation involves (e.g: In MOV [10] r10b, the mu_op STO [10] has an operand size of 1 byte)
+        bufferItem = {"opcode": None, "operand": None, "operandSize": operandSize} # operandSize is the no. bytes the operation involves (e.g: In MOV [10] r10b, then mu_op STO [10] has an operand size of 1 byte)
 
         decomposedMu_op = item.split()
         match len(decomposedMu_op):
@@ -285,10 +290,39 @@ class PipelineBuffer(CircularBuffer):
                 bufferItem["operand"] = int(operand) if operand.isnumeric() else operand
             case _:
                 raise Exception(f"mu-op has unexpected number of operands! Expected 1 or 2, got {len(decomposedMu_op)}\n\
-                                Recieved mu-op: {item}\n\
+                                Received mu-op: {item}\n\
                                 Decomposed mu-op: {decomposedMu_op}")
         
         return bufferItem
+
+class GlobalHistoryRegister(CircularBuffer):
+    def __init__(self, size: int = 8, name: str = "Global History Register"):
+        super().__init__(size, name)
+        # Fill buffer up, set pointers to front and end
+        self._Buffer = [True for i in range(size)]
+        self._frontPointer = 0
+        self._rearPointer = size - 1
+    
+    # Add removes item at front of GHR (Gives space to insert new item, as GHR always full)
+    def Add(self, item: bool|list, size: int = 1):
+        self._frontPointer = (self._frontPointer + size) % self._SIZE
+        super().Add(item, size)
+
+    def CreateBufferItem(self, item: bool, size: int, data: dict):
+        if type(item) != bool:
+            raise Exception(f"Attempted to insert non-bool into GHR! GHR should only contain T/F predictions! Received {item}")
+        return item
+    
+    # Returns contents of buffer as int, by converting list to binary value, where T = 1, F = 0
+    def GetBufferAsInt(self):
+        bufferValue = 0
+        # For element in buffer, add 2^i * element to value
+        for i in range(self._SIZE):
+            element = self._Buffer[(self._frontPointer + i) % self._SIZE]
+            elementValue = (2**i) if element == True else 0
+            bufferValue += elementValue 
+        return bufferValue
+
 
 # Buffer of branch instruction {from: location, to: location}
 class BranchTargetBuffer(HashTableBuffer):
@@ -302,7 +336,7 @@ class BranchTargetBuffer(HashTableBuffer):
         return {"source": item["source"],
                 "destination": item["destination"]}
     
-# Buffer of branch locations, and wether to predict taken or not
+# Buffer of branch locations, and whether to predict taken or not
 class DirectionBuffer(HashTableBuffer):
     def __init__(self, size: int = 16, name: str = "Branch Direction Buffer"):
         super().__init__(size, name)
@@ -314,3 +348,4 @@ class DirectionBuffer(HashTableBuffer):
         return {"source": item["source"],
                 "certainty": item["certainty"]}
     
+breakpoint
