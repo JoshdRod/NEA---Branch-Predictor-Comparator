@@ -1,7 +1,5 @@
-;; Same as bubble sort, just without global _start - as I don't entirely understand that, and it's not the point of the project
-
 section .data
-    array db 81, 77, 68, 69, 74, 65 ; Initialised an array?
+    array db 81, 77, 68, 69, 74, 65 ; Initialised array
 
 section .text
         
@@ -27,8 +25,7 @@ section .text
 
         jmp .endTurn
 
-    .swap:
-        ;REDUNDANT, AS ALREADY DONE IN COMPARISON mov r10, [rdi]     
+    .swap:   
         mov r11b, [rdi+1] ; Need to store both in registers before swap, as CPU cannot do mem - mem operations
         mov [rdi], r11b
         mov [rdi+1], r10b
