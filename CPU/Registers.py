@@ -1,4 +1,3 @@
-# TODO: WHAT ABOUT MOV [memaddr] rbxb?? Wouldn't that move the 0s in as well?
 class Registers:
     ##-------REGISTERS-------##
     Registers = {

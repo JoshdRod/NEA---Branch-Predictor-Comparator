@@ -1,20 +1,7 @@
-"""
-TODO:
-- Implement branch predictors!
-- Rename all load functions to get
-- Clean up passing operand into mu-op functions in execute - most functions just take the int value of the operator (jmp and sto being the issue), try to convert it before!
-- Fix fact that all computed memory addresses can't contain spaces in the compiler (e.g: Won't accept "[rax + 5]" must be "[rax+5]")
-- A direct CPU interface would be nice (like the IDLE interpreter)
-"""
-
 from CPU.MainMemory import MainMemory
 from CPU.Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer, DirectionBuffer
 from CPU.AddressGenerationUnit import AGU
 from CPU.Registers import Registers
-# from MainMemory import MainMemory
-# from Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer, DirectionBuffer
-# from AddressGenerationUnit import AGU
-# from Registers import Registers
 import time
 
 class Processor:
@@ -28,7 +15,7 @@ class Processor:
         self.AGU = AGU(self.registers)
 
         ## Control signals
-        self.running = True # TODO: REPLACE FLAG IN EFLAGS W/ THIS
+        self.running = True
         self.stalledStages = {"Fetch" : False,
                       "Decode" : True,
                       "Execute" : True}
@@ -103,7 +90,6 @@ class Processor:
                         or (self.DEBUG["executedMicroOps"]["operand"] == filterOperand and filterOperand is not None)\
                         or (self.cycleCount == filterCycle and filterCycle is not None)\
                     )\
-                    #and not self.stalledStages["Execute"]\
                 )\
                 or (\
                         filterOpcode == None\
@@ -140,11 +126,10 @@ class Processor:
                                    "operandSize": None}}
             self.stalledStages["Fetch"] = False
             self.cycleCount += 1
-            #time.sleep(0.05)
 
         # Stage 5 - Stop executing
         print(f"DONE! In {self.cycleCount} cycles\nHave a nice day :)")
-        return self.predictionTracker # TODO: IMPLEMENT RETURNING CORRECT DICT (In fun definition)
+        return self.predictionTracker
             
 
 
@@ -155,7 +140,7 @@ class Processor:
         rip = self.registers.Load("ripb") # As only first byte contains instruction pointer (bodge as rip is an 8 byte int on a cpu that only deals with 1 byte ints)
         prediction = self.predictor.Predict(rip)
         if rip + 1 == prediction: # No branch taken
-            speculative = False # TODO: Bug that predictions from a stall are considered speculative, when they're not..
+            speculative = False
         else: # Branch taken
             speculative = True # For now, speculative = branch taken
 
@@ -502,7 +487,7 @@ class Processor:
             # Add cycle number to prediction tracker
             self.predictionTracker["Predicted"].append(self.cycleCount)
 
-        return # TODO: Test adding to BTB works
+        return
 
     # SYSCALL
     # Performs a OS call operation (like printing to screen)
@@ -538,19 +523,6 @@ class Processor:
                 # Flush pipeline
                 self.Flush()
                 return
-    
-    def Call():
-        pass
-
-    def Return():
-        pass
-
-    def Push():
-        pass
-
-    def Pop():
-        pass
-
 
     ##-------SPECIAL INSTRUCTIONS-------##
     # Flushes pipeline
@@ -579,5 +551,3 @@ class Processor:
         
     def isImmediateValue(self, src: int) -> bool:
         return True if type(src) is int else False
-
-breakpoint

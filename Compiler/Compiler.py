@@ -3,10 +3,6 @@ class Compiler:
     SymbolTable = [None for i in range(100)]
     Offsets = {}
 
-    # TODO: Fix complier not dealing with numeric addition on pointer addresses
-    # (e.g: "mov rbp, array + 5" -> ["mov", "rbp,", "{location of pointer array + 5}"]
-    # instead of: ["mov", "rbp,", "array", "+", "5"])
-
     # Deal w/ data values in the _data section (assign them locations in memory + replace pointers w/ their locations)
     def Compile(self, f: typing.TextIO) -> list:
         # Read in file
@@ -88,9 +84,6 @@ class Compiler:
 
         return asm
 
-    # Should get an error, because as when the label is eventually removed from the source code, its pointer,
-    # and all subsequent, are going to be off by an offset of 1. This offset increases for every new label defined
-    # But we're not.. and I've not no clue why...
     def GenerateSymbolTable(self, symbols: list):
         if len(symbols) == 0:
             return
@@ -137,7 +130,7 @@ class Compiler:
                 potentialSymbolName = rawToken
 
             # Find the label in the symbol table
-            key = self.hash(potentialSymbolName) # There's never going to be a comma on the end of a label, is there? I don't believe so, as we should only be using them for jumps
+            key = self.hash(potentialSymbolName) # There's never going to be a comma on the end of a label, is there? Don't believe so, as we should only be using them for jumps
             for i in range(100):
                 # If token doesn't exist in table (so not a symbol), return token  
                 if self.SymbolTable[key + i] is None: 
@@ -159,7 +152,7 @@ class Compiler:
                             case '/':
                                 location /= operand
                     # Return the value
-                    replacedLine += str(location) + ' ' # Don't think the []s are needed, as [] denotes VALUE of mem. address - we just want the address itself
+                    replacedLine += str(location) + ' ' # []s not needed, as [] denotes VALUE of mem. address - we just want the address itself
                     break
             else:  
                 raise Exception(f"Symbol Table full (and label {rawToken} couldn't be found)! {self.SymbolTable}")
@@ -195,5 +188,3 @@ class Compiler:
         else:
             endPointer = None
         return asm[startPointer : endPointer]
-
-breakpoint

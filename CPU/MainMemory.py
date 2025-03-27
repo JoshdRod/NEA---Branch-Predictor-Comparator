@@ -1,5 +1,4 @@
 class MainMemory:
-    # WIP - Figure out how main memory actually communicates w/ the cpu
     def __init__(self, size: int):
         self._SIZE = size
         self.__data__ = [None for i in range(self._SIZE)] # For now, store all data in memory in 4 byte sections
