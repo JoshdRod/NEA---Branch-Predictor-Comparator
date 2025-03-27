@@ -39,6 +39,10 @@ class BasePredictor:
     def Update(self, source: int, destination: int, branchOutcome: bool):
         raise NotImplementedError()
 
+## -----------------------------------------
+# STATIC PREDICTORS
+## -----------------------------------------
+
 # Always not taken
 class AlwaysNotTaken(BasePredictor): 
     def __init__(self, BTB, directionBuffer, name="Always Not Taken"):
@@ -82,7 +86,11 @@ class AlwaysTaken(BasePredictor):
         ## If not, add it
         self.BTB.Add({"source": source,
                       "destination": destination})
-        
+
+## -----------------------------------------
+# LOCAL PREDICTORS
+## -----------------------------------------
+    
 """
 Base Last Time Predictor - Predicts direction based on last n times that branch was reached
 EXTRA DATA:
@@ -169,7 +177,7 @@ class OneBitLastTime(BaseLastTime):
     def CheckIfBranchShouldBePredicted(self, programCounter: int) -> bool:
         return self.DirectionBuffer.Get(programCounter)["certainty"]
 
-    def CalculateNewDirectionCertainty(self, programCounter: int, branchOutcome: bool) -> int:
+    def CalculateNewDirectionCertainty(self, programCounter: int, branchOutcome: bool) -> bool:
         return branchOutcome
         
 class TwoBitLastTime(BaseLastTime):
@@ -206,5 +214,110 @@ class TwoBitLastTime(BaseLastTime):
             # If not taken, sub 1 if certainty not 0 
             else:
                 return certainty if certainty == 0 else certainty - 1
-            
-breakpoint
+
+## -----------------------------------------
+# GLOBAL PREDICTORS
+## -----------------------------------------
+
+class gshare(BasePredictor):
+    # Creates an 8 bit global history register
+    def __init__(self, BTB, directionBuffer, name="gshare"):
+        super().__init__(BTB, directionBuffer, name)
+        ## BUFFERS IN GSHARE PREDICTOR
+        # GHR stores result of last 8 branches (including speculatively predicted ones)
+        # OBQ stores branches knocked out of GHR due to speculative execution
+        # When a branch is predicted, result is added to tail of GHR, and old head appended to OBQ
+        # When branch is evaluated, and PREDICTED CORRECTLY, GHR taken, OBQ appended to head, tail cut off to hit correct size. Head of OBQ removed
+        # When branch is evaluated, and MISPREDICTED, GHR taken, OBQ appended to head, tail cut off to his correct size. GHR <- this value (reset). OBQ flushed 
+        self.GlobalHistoryRegister = Buffers.GlobalHistoryRegister(8) # TODO: Would be cool to allow user to modify this
+        self.OutstandingBranchQueue = Buffers.CircularBuffer(16)
+
+    def Predict(self, programCounter):
+        if self.stalled == True:
+            self.stalled = False
+            return programCounter
+
+        ## Check if program counter is a key in BTB
+        BTBEntry = self.BTB.Get(programCounter)
+        # If not, return pc + 1
+        if type(BTBEntry) != dict:
+            return programCounter + 1
+        
+        # XOR program counter and GHR, predict
+        DirectionBufferIndex = programCounter ^ self.ConvertBufferToInt(self.GlobalHistoryRegister) # ^ denotes bitwise XOR
+        prediction = self.DirectionBuffer.Get(DirectionBufferIndex)
+        if type(prediction) == dict: prediction = prediction["certainty"] # Prediction found in Direction Buffer!
+        else: prediction = True # For branches that have not been hit with given history yet, assume True
+        # Head of GHR added to OBQ
+        self.OutstandingBranchQueue.Add(self.GlobalHistoryRegister.Get())
+        # Prediction added to GHR
+        self.GlobalHistoryRegister.Add(prediction)
+        # Return correct program counter value based on prediction
+        if prediction:
+            return BTBEntry["destination"]
+        else:
+            return programCounter + 1
+    
+    def Update(self, source, destination, branchOutcome):
+        # Take GHR, add OBQ to the end of it
+        nonSpeculativeGlobalHistory = Buffers.CircularBuffer(self.GlobalHistoryRegister._SIZE)
+        # OBQ Size = (rear - front) % max size + 1
+        OBQSize = self.OutstandingBranchQueue.Size()
+        
+        # Add non-speculative section of GHR
+        for i in range(self.GlobalHistoryRegister._SIZE - OBQSize):
+            nonSpeculativeGlobalHistory.Add(self.GlobalHistoryRegister.Get(i))
+        # Add oldest entries in OBQ until at GHR length
+        for i in range(self.GlobalHistoryRegister._SIZE - nonSpeculativeGlobalHistory.Size()):
+            nonSpeculativeGlobalHistory.Add(self.OutstandingBranchQueue.Get(i))
+
+        # Use (value xor source location) as index for BTB insertion
+        index = self.ConvertBufferToInt(nonSpeculativeGlobalHistory) ^ source
+        btbItem = {"source": source,
+                    "destination": destination}
+        directionItem = {"source": index,
+                         "certainty": branchOutcome}
+        
+        sourceInBTB = type(self.BTB.Get(source)) is dict
+        sourceInDirectionBuffer =  type(self.DirectionBuffer.Get(index)) is dict
+        
+        # Check if DB needs to be added to, or updated
+        if sourceInDirectionBuffer:
+            self.DirectionBuffer.Update(directionItem)
+        else:
+            self.DirectionBuffer.Add(directionItem)
+
+        # Correct prediction => branch outcome is the same as GHR entry that pushed first entry in OBQ (prediction)
+        if sourceInBTB: # Have encountered branch before - so we need to UPDATE its entries
+            correctlyPredicted = branchOutcome == self.GlobalHistoryRegister.Get(-(OBQSize))
+
+            self.BTB.Update(btbItem)
+        else: # Happens when we have not encountered this branch yet - in this case, we need to add to BTB + GHR
+            correctlyPredicted = False
+            # Set BTB at index == destination
+            self.BTB.Add(btbItem)
+
+        # If predicted, remove from front of OBQ and return
+        if correctlyPredicted:
+            self.OutstandingBranchQueue.Remove()
+            return
+        # If mispredicted, nonSpecGlobalHistory -> GHR, add new branch, clear OBQ, return
+        else:
+            # Reset GHR to non-speculative history
+            self.GlobalHistoryRegister.Flush()
+            self.GlobalHistoryRegister.Add(nonSpeculativeGlobalHistory._Buffer)
+            # Add latest branch result 
+            self.GlobalHistoryRegister.Add(branchOutcome)
+            # Flush OBQ
+            self.OutstandingBranchQueue.Flush()
+            return
+
+    # Returns contents of buffer as int, by converting list to binary value, where T = 1, F = 0
+    def ConvertBufferToInt(self, buffer: type[Buffers.CircularBuffer]) -> int:        
+        bufferValue = 0
+        # For element in buffer, add 2^i * element to value
+        for i in range(buffer._SIZE):
+            element = buffer._Buffer[(buffer._frontPointer + i) % buffer._SIZE]
+            elementValue = (2**i) if element == True else 0
+            bufferValue += elementValue 
+        return bufferValue

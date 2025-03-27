@@ -11,6 +11,10 @@ from CPU.MainMemory import MainMemory
 from CPU.Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer, DirectionBuffer
 from CPU.AddressGenerationUnit import AGU
 from CPU.Registers import Registers
+# from MainMemory import MainMemory
+# from Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer, DirectionBuffer
+# from AddressGenerationUnit import AGU
+# from Registers import Registers
 import time
 
 class Processor:
@@ -20,7 +24,7 @@ class Processor:
         self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
-        self.predictor = predictor(BranchTargetBuffer(32), DirectionBuffer(32))
+        self.predictor = predictor(BranchTargetBuffer(64), DirectionBuffer(256))
         self.AGU = AGU(self.registers)
 
         ## Control signals
@@ -125,6 +129,7 @@ class Processor:
                 elif response == 'N':
                     filterCycle = int(input("Enter cycle number to set breakpoint on: "))
 
+            print(f"Cycle no. : {self.cycleCount}")
             # Reset cycle data, increment cycle no, unstall fetch if stalled
             self.DEBUG = {
             "fetchedInstruction": None,
@@ -135,7 +140,7 @@ class Processor:
                                    "operandSize": None}}
             self.stalledStages["Fetch"] = False
             self.cycleCount += 1
-            time.sleep(0.05)
+            #time.sleep(0.05)
 
         # Stage 5 - Stop executing
         print(f"DONE! In {self.cycleCount} cycles\nHave a nice day :)")
@@ -173,7 +178,7 @@ class Processor:
         # Unstall Decode for next cycle
         self.stalledStages["Decode"] = False
 
-        ## Return fetched instruction for output console
+        ## Return fetc  hed instruction for output console
         self.DEBUG["fetchedInstruction"] = self.registers.Load("cir")
 
     def Decode(self):
@@ -239,7 +244,7 @@ class Processor:
             case "noop":
                 mu_opBuffer.append("NOOP")
             case _:
-                raise Exception(f"Invalid operation recieved: {opcode}")
+                raise Exception(f"Invalid operation received: {opcode}")
         
         # Mark instructions if speculative
         if speculative:
@@ -293,6 +298,8 @@ class Processor:
                 self.Syscall() # Syscall doesn't take an operand
             case "NOOP":
                 pass # No operation
+            case _:
+                raise Exception(f"Tried to execute invalid opcode! {mu_op['opcode']}")
             
         # Stage 3 : Remove mu-op from pipeline buffer + ROB
         self.pipelineBuffer.Remove()
@@ -475,7 +482,7 @@ class Processor:
         # Update branch predictor with result
         branchSource = self.reorderBuffer.Get()["location"]
         branchDestination = self.registers.Load("raxb")
-        self.predictor.Update(branchSource, branchDestination, comparisonMet)
+        self.predictor.Update(branchSource, branchDestination, bool(comparisonMet))
 
         # If met, next fetch location = rax
         if comparisonMet:
@@ -573,5 +580,4 @@ class Processor:
     def isImmediateValue(self, src: int) -> bool:
         return True if type(src) is int else False
 
-# P = Processor()
-# P.Compute()
+breakpoint
