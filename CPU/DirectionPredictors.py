@@ -210,7 +210,7 @@ class TwoBitLastTime(BaseLastTime):
             # If outcome = taken, add 1 if certainty not 3
             certainty = sourceInDirectionBuffer["certainty"]
             if branchOutcome:
-                return certainty if certainty == 4 else certainty + 1
+                return certainty if certainty == 3 else certainty + 1
             # If not taken, sub 1 if certainty not 0 
             else:
                 return certainty if certainty == 0 else certainty - 1
