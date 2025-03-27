@@ -252,8 +252,6 @@ class gshare(BasePredictor):
         self.OutstandingBranchQueue.Add(self.GlobalHistoryRegister.Get())
         # Prediction added to GHR
         self.GlobalHistoryRegister.Add(prediction)
-        print("Added to OBQ")
-        print(self.OutstandingBranchQueue.GetBuffer())
         # Return correct program counter value based on prediction
         if prediction:
             return BTBEntry["destination"]
@@ -283,8 +281,6 @@ class gshare(BasePredictor):
         sourceInBTB = type(self.BTB.Get(source)) is dict
         sourceInDirectionBuffer =  type(self.DirectionBuffer.Get(index)) is dict
         
-        print(f"Update - Expected {self.GlobalHistoryRegister.Get(-(OBQSize))}, got {branchOutcome}")
-
         # Check if DB needs to be added to, or updated
         if sourceInDirectionBuffer:
             self.DirectionBuffer.Update(directionItem)
@@ -304,8 +300,6 @@ class gshare(BasePredictor):
         # If predicted, remove from front of OBQ and return
         if correctlyPredicted:
             self.OutstandingBranchQueue.Remove()
-            print("Correct Prediciton: Removed entry from OBQ")
-            print(self.OutstandingBranchQueue.GetBuffer())
             return
         # If mispredicted, nonSpecGlobalHistory -> GHR, add new branch, clear OBQ, return
         else:
@@ -316,8 +310,6 @@ class gshare(BasePredictor):
             self.GlobalHistoryRegister.Add(branchOutcome)
             # Flush OBQ
             self.OutstandingBranchQueue.Flush()
-            print("Incorrect Prediciton: Flushed OBQ")
-            print(self.OutstandingBranchQueue.GetBuffer())
             return
 
     # Returns contents of buffer as int, by converting list to binary value, where T = 1, F = 0
