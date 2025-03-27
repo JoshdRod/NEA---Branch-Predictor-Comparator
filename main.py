@@ -31,7 +31,8 @@ while True:
     print("""0. Always Not Taken
 1. Always Taken
 2. One-Bit Last Time
-3. Two-Bit Last Time""")
+3. Two-Bit Last Time
+4. gshare""")
     match input():
         case '0':
             predictor = CPU.DirectionPredictors.AlwaysNotTaken
@@ -44,6 +45,9 @@ while True:
             break
         case '3':
             predictor = CPU.DirectionPredictors.TwoBitLastTime
+            break
+        case '4':
+            predictor = CPU.DirectionPredictors.gshare
             break
         case _:
             continue

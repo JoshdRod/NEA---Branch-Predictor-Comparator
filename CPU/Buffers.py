@@ -9,6 +9,7 @@ FUNCTIONALITY:
 Add/Remove
 Update (a specific index in buffer)
 Get (a specific index in buffer)
+Get Whole Buffer (in order)
 GetNumberOfFreeSpaces (left)
 """
 
@@ -32,6 +33,12 @@ class Buffer:
     RETURNS: dict buffer item at given index
     """
     def Get(self, index: int = 0) -> dict:
+        raise NotImplementedError()
+
+    """
+    Returns in the buffer as a list, from start to end
+    """
+    def GetBuffer(self) -> list:
         raise NotImplementedError()
 
     """
@@ -71,11 +78,14 @@ Circular Buffer - Storing data as a Generic Circular Queue
 ADDITIONAL DATA:
     int front / rear pointers
 
+ADDITIONAL FUNCTIONALITY:
+    Find Size of Buffer currently in use
+    
 REQUIRED FUNCTIONALITY ON SUBCLASSES:
     CreateBufferItem (formats the item fed into Add, so that it can be added to the table with the correct information)
 """
 class CircularBuffer(Buffer):
-    def __init__(self, size, name):
+    def __init__(self, size, name = None):
         super().__init__(size, name)
         self._frontPointer = -1
         self._rearPointer = -1
@@ -89,6 +99,11 @@ class CircularBuffer(Buffer):
     # Uses pointers to get item at correct index
     def Get(self, index: int = 0) -> dict:
         return self._Buffer[(self._frontPointer + index) % self._SIZE]
+
+    # Go from first to last element, return list
+    def GetBuffer(self) -> list:
+        return [self.Get(i) for i in range(self.Size())]
+
     
     # Uses pointers to add item/lists of items at end of buffer (data = metadata (e.g: instruction location))
     def Add(self, item: str|list, size: int = 1, data: dict = None):
@@ -136,15 +151,22 @@ class CircularBuffer(Buffer):
         self._frontPointer = -1
         self._rearPointer = -1
 
+    # Calculates number of elements in buffer currently in use
+    def Size(self):
+        if self._frontPointer == -1:
+            return 0
+        else:
+            return ((self._rearPointer - self._frontPointer) % self._SIZE) + 1
+
 
     ## Required methods for child classes
     """
     Takes in an item to be added to buffer, and formats it correctly
-    INPUTS: item to be added
+    INPUTS: item to be added, int size of item (e.g: 2 bits), dict metadata (e.g mem. address location of buffer item)
     RETURNS: correctly formatted item
     """
-    def CreateBufferItem(item):
-        raise NotImplementedError()
+    def CreateBufferItem(self, item, size, data):
+        return item
     
 """
 Hash Table Buffer - Storing data as a hash table
@@ -303,7 +325,7 @@ class GlobalHistoryRegister(CircularBuffer):
         self._frontPointer = 0
         self._rearPointer = size - 1
     
-    # Add removes item at front of GHR (Gives space to insert new item, as GHR always full)
+    # Add removes item at front of GHR (Removes oldest item to give space to insert new item, as GHR always full)
     def Add(self, item: bool|list, size: int = 1):
         self._frontPointer = (self._frontPointer + size) % self._SIZE
         super().Add(item, size)
@@ -312,17 +334,6 @@ class GlobalHistoryRegister(CircularBuffer):
         if type(item) != bool:
             raise Exception(f"Attempted to insert non-bool into GHR! GHR should only contain T/F predictions! Received {item}")
         return item
-    
-    # Returns contents of buffer as int, by converting list to binary value, where T = 1, F = 0
-    def GetBufferAsInt(self):
-        bufferValue = 0
-        # For element in buffer, add 2^i * element to value
-        for i in range(self._SIZE):
-            element = self._Buffer[(self._frontPointer + i) % self._SIZE]
-            elementValue = (2**i) if element == True else 0
-            bufferValue += elementValue 
-        return bufferValue
-
 
 # Buffer of branch instruction {from: location, to: location}
 class BranchTargetBuffer(HashTableBuffer):

@@ -11,6 +11,10 @@ from CPU.MainMemory import MainMemory
 from CPU.Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer, DirectionBuffer
 from CPU.AddressGenerationUnit import AGU
 from CPU.Registers import Registers
+# from MainMemory import MainMemory
+# from Buffers import ReorderBuffer, PipelineBuffer, BranchTargetBuffer, DirectionBuffer
+# from AddressGenerationUnit import AGU
+# from Registers import Registers
 import time
 
 class Processor:
@@ -20,7 +24,7 @@ class Processor:
         self.mainMemory = MainMemory(100) # 100 byte (lines) main memory
         self.reorderBuffer = ReorderBuffer(16) # 16 byte (section) buffer
         self.pipelineBuffer = PipelineBuffer(16)
-        self.predictor = predictor(BranchTargetBuffer(32), DirectionBuffer(32))
+        self.predictor = predictor(BranchTargetBuffer(64), DirectionBuffer(256))
         self.AGU = AGU(self.registers)
 
         ## Control signals
@@ -73,58 +77,59 @@ class Processor:
             if not self.stalledStages["Fetch"]:
                 self.Fetch()
 
-            print(f"""
-    -----------------------CYCLE {self.cycleCount}-----------------------
-                    PROGRAM COUNTER: {self.registers.Load("rip")}
-                    {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
-                    Decoded: 
-                    {f"{self.DEBUG["decodedInstruction"]} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
-                    Executed: 
-                    {f"{self.DEBUG["executedMicroOps"]}." if self.DEBUG["executedMicroOps"]["opcode"] is not None else "Execute Stalled!"}
+    #         print(f"""
+    # -----------------------CYCLE {self.cycleCount}-----------------------
+    #                 PROGRAM COUNTER: {self.registers.Load("rip")}
+    #                 {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
+    #                 Decoded: 
+    #                 {f"{self.DEBUG["decodedInstruction"]} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
+    #                 Executed: 
+    #                 {f"{self.DEBUG["executedMicroOps"]}." if self.DEBUG["executedMicroOps"]["opcode"] is not None else "Execute Stalled!"}
                     
-                    Pipeline: {self.pipelineBuffer._Buffer}
-                    (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
+    #                 Pipeline: {self.pipelineBuffer._Buffer}
+    #                 (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
 
-                    Re-Order Buffer: {self.reorderBuffer._Buffer}
-                    (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
+    #                 Re-Order Buffer: {self.reorderBuffer._Buffer}
+    #                 (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
 
-                    Registers: {self.registers.Registers.items()}
+    #                 Registers: {self.registers.Registers.items()}
 
-                    Main Memory: {self.mainMemory.__data__}
-            """)
+    #                 Main Memory: {self.mainMemory.__data__}
+    #         """)
 
-            if  (
-                    (
-                        (self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode and filterOpcode is not None)\
-                        or (self.DEBUG["executedMicroOps"]["operand"] == filterOperand and filterOperand is not None)\
-                        or (self.cycleCount == filterCycle and filterCycle is not None)\
-                    )\
-                    #and not self.stalledStages["Execute"]\
-                )\
-                or (\
-                        filterOpcode == None\
-                        and filterOperand == None\
-                        and filterCycle == None\
-                    )\
-                and debug == True:
+    #         if  (
+    #                 (
+    #                     (self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode and filterOpcode is not None)\
+    #                     or (self.DEBUG["executedMicroOps"]["operand"] == filterOperand and filterOperand is not None)\
+    #                     or (self.cycleCount == filterCycle and filterCycle is not None)\
+    #                 )\
+    #                 #and not self.stalledStages["Execute"]\
+    #             )\
+    #             or (\
+    #                     filterOpcode == None\
+    #                     and filterOperand == None\
+    #                     and filterCycle == None\
+    #                 )\
+    #             and debug == True:
                 
-                # Reset filters
-                filterOpcode = None 
-                filterOperand = None
-                filterCycle = None
+    #             # Reset filters
+    #             filterOpcode = None 
+    #             filterOperand = None
+    #             filterCycle = None
                 
-                print("""
-                    NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
-                    """)
+    #             print("""
+    #                 NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
+    #                 """)
 
-                response = input()
-                if response == 'C':
-                    filterOpcode = input("Enter opcode to set breakpoint on: ")
-                elif response == 'A':
-                    filterOperand = input("Enter operand to set breakpoint on: ")
-                elif response == 'N':
-                    filterCycle = int(input("Enter cycle number to set breakpoint on: "))
+    #             response = input()
+    #             if response == 'C':
+    #                 filterOpcode = input("Enter opcode to set breakpoint on: ")
+    #             elif response == 'A':
+    #                 filterOperand = input("Enter operand to set breakpoint on: ")
+    #             elif response == 'N':
+    #                 filterCycle = int(input("Enter cycle number to set breakpoint on: "))
 
+            print(f"Cycle no. : {self.cycleCount}")
             # Reset cycle data, increment cycle no, unstall fetch if stalled
             self.DEBUG = {
             "fetchedInstruction": None,
@@ -135,7 +140,7 @@ class Processor:
                                    "operandSize": None}}
             self.stalledStages["Fetch"] = False
             self.cycleCount += 1
-            time.sleep(0.05)
+            #time.sleep(0.05)
 
         # Stage 5 - Stop executing
         print(f"DONE! In {self.cycleCount} cycles\nHave a nice day :)")
@@ -173,7 +178,7 @@ class Processor:
         # Unstall Decode for next cycle
         self.stalledStages["Decode"] = False
 
-        ## Return fetched instruction for output console
+        ## Return fetc  hed instruction for output console
         self.DEBUG["fetchedInstruction"] = self.registers.Load("cir")
 
     def Decode(self):
@@ -239,7 +244,7 @@ class Processor:
             case "noop":
                 mu_opBuffer.append("NOOP")
             case _:
-                raise Exception(f"Invalid operation recieved: {opcode}")
+                raise Exception(f"Invalid operation received: {opcode}")
         
         # Mark instructions if speculative
         if speculative:
@@ -271,6 +276,8 @@ class Processor:
         mu_op = self.pipelineBuffer.Get()
         self.DEBUG["executedMicroOps"] = mu_op
 
+        print(self.reorderBuffer.Get()["location"])
+
         # Stage 2 : If operand is a memory address, run through AGU to calculate mem address to access
         if self.isMemoryAddress(mu_op["operand"]):
             mu_op["operand"] = self.AGU.Generate(mu_op["operand"])
@@ -293,6 +300,8 @@ class Processor:
                 self.Syscall() # Syscall doesn't take an operand
             case "NOOP":
                 pass # No operation
+            case _:
+                raise Exception(f"Tried to execute invalid opcode! {mu_op['opcode']}")
             
         # Stage 3 : Remove mu-op from pipeline buffer + ROB
         self.pipelineBuffer.Remove()
@@ -475,7 +484,7 @@ class Processor:
         # Update branch predictor with result
         branchSource = self.reorderBuffer.Get()["location"]
         branchDestination = self.registers.Load("raxb")
-        self.predictor.Update(branchSource, branchDestination, comparisonMet)
+        self.predictor.Update(branchSource, branchDestination, bool(comparisonMet))
 
         # If met, next fetch location = rax
         if comparisonMet:
@@ -573,5 +582,4 @@ class Processor:
     def isImmediateValue(self, src: int) -> bool:
         return True if type(src) is int else False
 
-# P = Processor()
-# P.Compute()
+breakpoint
