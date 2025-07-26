@@ -358,5 +358,3 @@ class DirectionBuffer(HashTableBuffer):
     def CreateBufferItem(self, item: dict) -> dict:
         return {"source": item["source"],
                 "certainty": item["certainty"]}
-    
-breakpoint

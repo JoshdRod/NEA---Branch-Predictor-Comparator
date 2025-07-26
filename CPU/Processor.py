@@ -64,56 +64,57 @@ class Processor:
             if not self.stalledStages["Fetch"]:
                 self.Fetch()
 
-            print(f"""
-    -----------------------CYCLE {self.cycleCount}-----------------------
-                    PROGRAM COUNTER: {self.registers.Load("rip")}
-                    {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
-                    Decoded: 
-                    {f"{self.DEBUG["decodedInstruction"]} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
-                    Executed: 
-                    {f"{self.DEBUG["executedMicroOps"]}." if self.DEBUG["executedMicroOps"]["opcode"] is not None else "Execute Stalled!"}
+            if debug:
+                # Debugging screen
+                print(f"""
+        -----------------------CYCLE {self.cycleCount}-----------------------
+                        PROGRAM COUNTER: {self.registers.Load("rip")}
+                        {f"Fetched: {self.DEBUG["fetchedInstruction"]} from location: {self.registers.Load("mar")}" if self.DEBUG["fetchedInstruction"] is not None else "Fetched stalled!"}
+                        Decoded: 
+                        {f"{self.DEBUG["decodedInstruction"]} into micro-ops: {self.DEBUG["decodedMicroOps"]}." if self.DEBUG["decodedMicroOps"] != [] else "Decode Stalled!"}
+                        Executed: 
+                        {f"{self.DEBUG["executedMicroOps"]}." if self.DEBUG["executedMicroOps"]["opcode"] is not None else "Execute Stalled!"}
+                        
+                        Pipeline: {self.pipelineBuffer._Buffer}
+                        (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
+
+                        Re-Order Buffer: {self.reorderBuffer._Buffer}
+                        (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
+
+                        Registers: {self.registers.Registers.items()}
+
+                        Main Memory: {self.mainMemory.__data__}
+                """)
+
+                if  (
+                        (
+                            (self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode and filterOpcode is not None)\
+                            or (self.DEBUG["executedMicroOps"]["operand"] == filterOperand and filterOperand is not None)\
+                            or (self.cycleCount == filterCycle and filterCycle is not None)\
+                        )\
+                    )\
+                    or (\
+                            filterOpcode == None\
+                            and filterOperand == None\
+                            and filterCycle == None\
+                        ):
                     
-                    Pipeline: {self.pipelineBuffer._Buffer}
-                    (Front Pointer: {self.pipelineBuffer._frontPointer} Rear Pointer: {self.pipelineBuffer._rearPointer})
+                    # Reset filters
+                    filterOpcode = None 
+                    filterOperand = None
+                    filterCycle = None
+                    
+                    print("""
+                        NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
+                        """)
 
-                    Re-Order Buffer: {self.reorderBuffer._Buffer}
-                    (Front Pointer: {self.reorderBuffer._frontPointer} Rear Pointer: {self.reorderBuffer._rearPointer})
-
-                    Registers: {self.registers.Registers.items()}
-
-                    Main Memory: {self.mainMemory.__data__}
-            """)
-
-            if  (
-                    (
-                        (self.DEBUG["executedMicroOps"]["opcode"] == filterOpcode and filterOpcode is not None)\
-                        or (self.DEBUG["executedMicroOps"]["operand"] == filterOperand and filterOperand is not None)\
-                        or (self.cycleCount == filterCycle and filterCycle is not None)\
-                    )\
-                )\
-                or (\
-                        filterOpcode == None\
-                        and filterOperand == None\
-                        and filterCycle == None\
-                    )\
-                and debug == True:
-                
-                # Reset filters
-                filterOpcode = None 
-                filterOperand = None
-                filterCycle = None
-                
-                print("""
-                    NEXT CYCLE? (C to set breakpoint on next opcode, A to set breakpoint on next operand, N to set breakpoint on specific cycle)
-                    """)
-
-                response = input()
-                if response == 'C':
-                    filterOpcode = input("Enter opcode to set breakpoint on: ")
-                elif response == 'A':
-                    filterOperand = input("Enter operand to set breakpoint on: ")
-                elif response == 'N':
-                    filterCycle = int(input("Enter cycle number to set breakpoint on: "))
+                    response = input()
+                    if response == 'C':
+                        filterOpcode = input("Enter opcode to set breakpoint on: ")
+                    elif response == 'A':
+                        filterOperand = input("Enter operand to set breakpoint on: ")
+                    elif response == 'N':
+                        filterCycle = int(input("Enter cycle number to set breakpoint on: "))
 
             print(f"Cycle no. : {self.cycleCount}")
             # Reset cycle data, increment cycle no, unstall fetch if stalled

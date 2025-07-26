@@ -1,5 +1,5 @@
 section .data
-    array db 81, 77, 68, 69, 74, 65 ; Initialised array
+    array db 98, 78, 27, 72, 65, 25, 47, 86, 10, 45, 6, 36, 28, 90, 56, 64, 39, 62, 8, 35, 75, 43, 58, 42, 81, 29, 82, 19, 94, 70, 22, 2, 63, 51, 18, 87, 54, 61, 30, 59, 24, 48, 46, 69, 84, 85, 57, 44, 89, 20, 53, 96, 77, 92, 14, 17, 34, 26, 100, 40, 31, 66, 79, 9 ; Initialised array
 
 section .text
         
@@ -7,7 +7,7 @@ section .text
     ; set pointer s to first element in array (i)
     mov rbx, array
     ; set pointer e to the end of the array (start + length - 1 (2)) (j)
-    mov rbp, array+5
+    mov rbp, array+49
     ; set current pointer c equal to s
     mov rdi, rbx
     ; Start
@@ -50,7 +50,7 @@ section .text
     .end:
         mov rdi, 1 ; stdout
         mov rsi, array ; msg
-        mov rdx, 6 ; size
+        mov rdx, 50 ; size
         mov rax, 1 ; write
         syscall
 
